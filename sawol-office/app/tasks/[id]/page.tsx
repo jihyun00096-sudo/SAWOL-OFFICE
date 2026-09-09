@@ -51,13 +51,11 @@ export default async function TaskDetailPage({
     { data: employees },
     { data: activeTasks },
     { data: runs },
+    { data: currentAssignment },
     { count: pendingApprovals },
   ] = await Promise.all([
     supabase.from("tasks").select("*").eq("id", id).maybeSingle(),
-    supabase
-      .from("projects")
-      .select("id, name")
-      .order("created_at", { ascending: false }),
+    supabase.from("projects").select("id, name").order("created_at", { ascending: false }),
     supabase
       .from("departments")
       .select("id, code, name, parent_department_id")
@@ -72,7 +70,7 @@ export default async function TaskDetailPage({
       .order("employee_code"),
     supabase
       .from("tasks")
-      .select("assigned_employee_id, status")
+      .select("id, assigned_employee_id, status")
       .not("assigned_employee_id", "is", null),
     supabase
       .from("task_runs")
@@ -82,6 +80,14 @@ export default async function TaskDetailPage({
       .eq("task_id", id)
       .order("created_at", { ascending: false }),
     supabase
+      .from("task_assignments")
+      .select("assignment_source, assignment_reason, match_score")
+      .eq("task_id", id)
+      .eq("status", "ACTIVE")
+      .order("assigned_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase
       .from("tasks")
       .select("id", { count: "exact", head: true })
       .eq("status", "PENDING_APPROVAL"),
@@ -89,7 +95,8 @@ export default async function TaskDetailPage({
 
   if (!task) notFound();
 
-  const workloads = buildEmployeeWorkloads((activeTasks ?? []) as any);
+  // 현재 업무 자체는 담당자의 다른 업무량 계산에서 제외.
+  const workloads = buildEmployeeWorkloads((activeTasks ?? []) as any, task.id);
 
   const candidates = rankEmployeesForTask({
     title: task.title,
@@ -108,29 +115,31 @@ export default async function TaskDetailPage({
         title={task.title}
         description={task.description ?? "업무 설명이 없습니다."}
         action={
-          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+          <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:justify-end">
             <Link
               href="/queue"
-              className="flex h-10 items-center justify-center rounded-[10px] border border-[#DCE4FF] bg-[#F8FAFF] px-4 text-[11px] font-semibold text-[#3157D5]"
+              className="flex h-10 min-w-[78px] items-center justify-center whitespace-nowrap rounded-[10px] border border-[#DCE4FF] bg-[#F8FAFF] px-3 text-[11px] font-semibold text-[#3157D5]"
             >
               실행 큐
             </Link>
 
             <Link
               href="/runs"
-              className="flex h-10 items-center justify-center rounded-[10px] border border-[#E1E4E9] bg-white px-4 text-[11px] font-semibold text-[#656B75]"
+              className="flex h-10 min-w-[78px] items-center justify-center whitespace-nowrap rounded-[10px] border border-[#E1E4E9] bg-white px-3 text-[11px] font-semibold text-[#656B75]"
             >
               실행 기록
             </Link>
 
             <Link
               href="/tasks"
-              className="flex h-10 items-center justify-center rounded-[10px] border border-[#E1E4E9] bg-white px-4 text-[11px] font-semibold text-[#656B75]"
+              className="flex h-10 min-w-[78px] items-center justify-center whitespace-nowrap rounded-[10px] border border-[#E1E4E9] bg-white px-3 text-[11px] font-semibold text-[#656B75]"
             >
               목록으로
             </Link>
 
-            <TaskDeleteButton taskId={task.id} taskTitle={task.title} />
+            <div className="[&>button]:h-10 [&>button]:min-w-[78px] [&>button]:whitespace-nowrap">
+              <TaskDeleteButton taskId={task.id} taskTitle={task.title} />
+            </div>
           </div>
         }
       />
@@ -141,10 +150,7 @@ export default async function TaskDetailPage({
           <div className="mt-2">
             <StatusBadge
               value={task.status}
-              label={
-                executionStatusLabel[task.status] ??
-                labelOf(taskStatusLabel, task.status)
-              }
+              label={executionStatusLabel[task.status] ?? labelOf(taskStatusLabel, task.status)}
             />
           </div>
         </div>
@@ -152,10 +158,7 @@ export default async function TaskDetailPage({
         <div className="rounded-[16px] border border-[#E7E9EE] bg-white p-4">
           <p className="text-[10px] text-[#9297A1]">우선순위</p>
           <div className="mt-2">
-            <StatusBadge
-              value={task.priority}
-              label={labelOf(priorityLabel, task.priority)}
-            />
+            <StatusBadge value={task.priority} label={labelOf(priorityLabel, task.priority)} />
           </div>
         </div>
 
@@ -171,6 +174,7 @@ export default async function TaskDetailPage({
         <AssignmentAssistant
           taskId={task.id}
           currentEmployeeId={task.assigned_employee_id}
+          currentAssignment={currentAssignment as any}
           candidates={candidates}
         />
       </div>

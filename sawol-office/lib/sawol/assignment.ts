@@ -60,6 +60,31 @@ const prefixBonus: Record<string, string[]> = {
   STUDY: ["RND", "MEM"],
 };
 
+const strongDomainTerms = [
+  "상세페이지",
+  "판매페이지",
+  "랜딩페이지",
+  "모바일",
+  "세로형",
+  "디자인",
+  "썸네일",
+  "배너",
+  "브랜드",
+  "카피",
+  "재개발",
+  "부동산",
+  "강의",
+  "교육",
+  "리서치",
+  "경쟁",
+  "시장",
+  "데이터",
+  "개발",
+  "자동화",
+  "api",
+  "보안",
+];
+
 const stopWords = new Set([
   "그리고", "에서", "으로", "부터", "까지", "대한", "관련", "현재",
   "이번", "업무", "프로젝트", "만들어", "해줘", "해주세요", "확인",
@@ -114,13 +139,16 @@ function isDepartmentDescendant(
 
 export function buildEmployeeWorkloads(
   tasks: Array<{
+    id?: string;
     assigned_employee_id: string | null;
     status: string;
   }>,
+  excludeTaskId?: string | null,
 ): AssignmentWorkload[] {
   const map = new Map<string, AssignmentWorkload>();
 
   for (const task of tasks) {
+    if (excludeTaskId && task.id === excludeTaskId) continue;
     if (!task.assigned_employee_id) continue;
     if (["COMPLETED", "CANCELLED", "CANCELED"].includes(task.status)) continue;
 
@@ -172,8 +200,9 @@ export function rankEmployeesForTask({
   departments: AssignmentDepartment[];
   workloads: AssignmentWorkload[];
 }): AssignmentCandidate[] {
-  const query = normalize(`${title} ${description}`);
-  const queryTokens = new Set(tokens(`${title} ${description}`));
+  const requestText = `${title} ${description}`;
+  const query = normalize(requestText);
+  const queryTokens = new Set(tokens(requestText));
   const workloadMap = new Map(workloads.map((item) => [item.employee_id, item]));
   const taskTerms = typeTerms[taskType] ?? [];
   const preferredPrefixes = prefixBonus[taskType] ?? [];
@@ -204,34 +233,48 @@ export function rankEmployeesForTask({
       ].join(" "),
     );
 
-    let score = 28;
+    let score = 24;
     const reasons: string[] = [];
 
+    // 업무유형은 참고 신호일 뿐, 도메인 전문성보다 앞서지 않도록 가중치를 낮춤.
     const prefix = employee.employee_code.split("-")[0];
     if (preferredPrefixes.includes(prefix)) {
-      score += 13;
-      reasons.push("업무 유형과 전문 조직이 잘 맞음");
+      score += 7;
+      reasons.push("업무 유형과 전문 조직이 연관됨");
     }
 
+    // 업무유형 키워드 일치
     const matchingTerms = taskTerms.filter(
       (term) => query.includes(term) && profile.includes(term),
     );
 
     if (matchingTerms.length) {
-      score += Math.min(24, matchingTerms.length * 8);
-      reasons.push(`전문 키워드 일치 · ${matchingTerms.slice(0, 3).join(", ")}`);
+      score += Math.min(16, matchingTerms.length * 5);
+      reasons.push(`업무 키워드 일치 · ${matchingTerms.slice(0, 3).join(", ")}`);
     }
 
+    // 상세페이지/디자인/개발 등 도메인 핵심어는 강하게 반영.
+    const strongMatches = strongDomainTerms.filter(
+      (term) => query.includes(term) && profile.includes(term),
+    );
+
+    if (strongMatches.length) {
+      score += Math.min(30, strongMatches.length * 10);
+      reasons.push(`핵심 전문분야 일치 · ${strongMatches.slice(0, 3).join(", ")}`);
+    }
+
+    // 일반 토큰은 보조 신호
     let tokenMatches = 0;
     for (const token of queryTokens) {
       if (profile.includes(token)) tokenMatches += 1;
     }
 
     if (tokenMatches > 0) {
-      score += Math.min(22, tokenMatches * 5);
+      score += Math.min(16, tokenMatches * 3);
       reasons.push(`요청 내용과 전문분야 ${tokenMatches}개 항목 일치`);
     }
 
+    // 부서는 동일 부서 또는 산하 전문팀을 강하게 우대.
     if (departmentId) {
       const relation = isDepartmentDescendant(
         employee.department_id,
@@ -240,38 +283,38 @@ export function rankEmployeesForTask({
       );
 
       if (relation === "DIRECT") {
-        score += 18;
+        score += 22;
         reasons.push("추천 부서에 직접 소속");
       } else if (relation === "DESCENDANT") {
-        score += 14;
+        score += 20;
         reasons.push("추천 부서 산하 전문팀 소속");
       } else {
-        score -= 6;
+        score -= 8;
       }
     }
 
     if (employee.status === "AVAILABLE") {
-      score += 9;
+      score += 8;
       reasons.push("현재 즉시 배정 가능");
     } else if (employee.status === "WAITING") {
-      score += 5;
+      score += 6;
       reasons.push("현재 대기 상태");
     } else if (employee.status === "WORKING") {
-      score -= 5;
+      score -= 6;
     } else if (employee.status === "REVIEWING") {
-      score -= 3;
+      score -= 4;
     } else if (employee.status === "APPROVAL_WAIT") {
       score += 1;
     }
 
-    const loadPenalty = Math.min(20, workload.active * 4);
+    const loadPenalty = Math.min(18, workload.active * 4);
     score -= loadPenalty;
 
     if (workload.active === 0) {
       score += 5;
       reasons.push("진행 중인 다른 업무 없음");
     } else {
-      reasons.push(`현재 활성 업무 ${workload.active}건`);
+      reasons.push(`다른 활성 업무 ${workload.active}건`);
     }
 
     score = Math.max(0, Math.min(100, Math.round(score)));
@@ -284,13 +327,11 @@ export function rankEmployeesForTask({
     });
   }
 
-  return candidates
-    .sort((a, b) => {
-      if (b.score !== a.score) return b.score - a.score;
-      if (a.workload.active !== b.workload.active) {
-        return a.workload.active - b.workload.active;
-      }
-      return a.employee.employee_code.localeCompare(b.employee.employee_code);
-    })
-    .slice(0, 8);
+  return candidates.sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    if (a.workload.active !== b.workload.active) {
+      return a.workload.active - b.workload.active;
+    }
+    return a.employee.employee_code.localeCompare(b.employee.employee_code);
+  });
 }
