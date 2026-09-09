@@ -1,12 +1,25 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { AiExecuteButton } from "@/components/sawol/ai-execute-button";
 import { OfficeShell } from "@/components/sawol/office-shell";
 import { PageHeader } from "@/components/sawol/page-header";
 import { TaskRunResultForm } from "@/components/sawol/task-run-result-form";
 import { runStatusLabel, runStatusTone } from "@/lib/sawol/run-labels";
+import {
+  getAiProviderDisplayName,
+  getAiProviderName,
+  isAiProviderConfigured,
+} from "@/lib/ai/provider";
 import { requireSawolAdmin } from "@/lib/auth/require-sawol-admin";
 
 export const dynamic = "force-dynamic";
+
+function metadataObject(value: unknown): Record<string, any> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+  return value as Record<string, any>;
+}
 
 export default async function RunDetailPage({
   params,
@@ -25,7 +38,7 @@ export default async function RunDetailPage({
       .select(
         `
         *,
-        tasks:task_id(id, title, task_code, description, status),
+        tasks:task_id(id, title, task_code, description, status, task_type),
         employees:employee_id(name, employee_code)
         `,
       )
@@ -40,6 +53,22 @@ export default async function RunDetailPage({
   if (!run) notFound();
 
   const task = run.tasks as any;
+  const metadata = metadataObject(run.metadata);
+  const step20 = metadataObject(metadata.step20);
+  const sources = Array.isArray(step20.sources) ? step20.sources : [];
+
+  const provider = getAiProviderName();
+  const providerLabel = getAiProviderDisplayName(provider);
+  const configured = isAiProviderConfigured(provider);
+
+  const configuredModel =
+    provider === "mock"
+      ? "sawol-mock-v1"
+      : process.env.OPENAI_MODEL || "gpt-5.6-luna";
+
+  const webSearchEnabled = !["0", "false", "off", "no"].includes(
+    (process.env.OPENAI_ENABLE_WEB_SEARCH || "true").toLowerCase(),
+  );
 
   return (
     <OfficeShell pendingApprovals={pendingApprovals ?? 0}>
@@ -89,24 +118,70 @@ export default async function RunDetailPage({
         </div>
 
         <div className="rounded-[16px] border border-[#E7E9EE] bg-white p-4">
-          <p className="text-[9px] text-[#9499A3]">연결 업무</p>
-          <p className="mt-2 text-[11px] font-semibold">
-            {task?.task_code ?? "-"}
+          <p className="text-[9px] text-[#9499A3]">AI Provider</p>
+          <p className="mt-2 break-words text-[11px] font-semibold">
+            {run.provider
+              ? `${run.provider} · ${run.model ?? "-"}`
+              : `${providerLabel} · ${configuredModel}`}
           </p>
         </div>
       </section>
 
+      {!run.result_body ? (
+        <div className="mt-5">
+          <AiExecuteButton
+            runId={run.id}
+            runStatus={run.status}
+            configured={configured}
+            provider={provider}
+            providerLabel={providerLabel}
+            model={configuredModel}
+            researchMode={
+              task?.task_type === "RESEARCH" && webSearchEnabled
+            }
+          />
+        </div>
+      ) : null}
+
+      {run.status === "FAILED" && run.error_message ? (
+        <section className="mt-5 rounded-[16px] border border-[#F0D2D2] bg-[#FFF8F8] p-4">
+          <p className="text-[10px] font-semibold text-[#A64242]">
+            이전 AI 실행 오류
+          </p>
+          <p className="mt-2 whitespace-pre-wrap break-words text-[10px] leading-5 text-[#8F6060]">
+            {run.error_message}
+          </p>
+        </section>
+      ) : null}
+
       {run.result_body ? (
         <section className="mt-5 rounded-[18px] border border-[#E7E9EE] bg-white p-5 sm:p-6">
-          <p className="text-[10px] font-semibold text-[#3157D5]">
-            제출 결과
-          </p>
-          <h2 className="mt-2 text-[16px] font-semibold">
-            {run.result_title}
-          </h2>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <p className="text-[10px] font-semibold text-[#3157D5]">
+                제출 결과
+              </p>
+              <h2 className="mt-2 text-[16px] font-semibold">
+                {run.result_title}
+              </h2>
+            </div>
+
+            {typeof step20.confidence === "number" ? (
+              <div className="flex flex-wrap gap-2">
+                <span className="rounded-full bg-[#F2F4F7] px-2.5 py-1 text-[9px] text-[#666C76]">
+                  신뢰도 {step20.confidence}%
+                </span>
+                {step20.needs_human_review ? (
+                  <span className="rounded-full bg-[#FFF5DD] px-2.5 py-1 text-[9px] text-[#8A6824]">
+                    사람 확인 권장
+                  </span>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
 
           {run.result_summary ? (
-            <p className="mt-3 rounded-[12px] bg-[#F7F8FA] px-4 py-3 text-[11px] leading-5 text-[#666C76]">
+            <p className="mt-4 rounded-[12px] bg-[#F7F8FA] px-4 py-3 text-[11px] leading-5 text-[#666C76]">
               {run.result_summary}
             </p>
           ) : null}
@@ -114,13 +189,53 @@ export default async function RunDetailPage({
           <div className="mt-5 whitespace-pre-wrap text-[12px] leading-7 text-[#444A54]">
             {run.result_body}
           </div>
+
+          {sources.length ? (
+            <div className="mt-6 border-t border-[#ECEEF2] pt-5">
+              <p className="text-[10px] font-semibold">참고 출처</p>
+              <div className="mt-3 space-y-2">
+                {sources.map((source: any, index: number) => (
+                  <div
+                    key={`${source.url ?? ""}-${index}`}
+                    className="rounded-[11px] bg-[#F7F8FA] p-3"
+                  >
+                    <p className="break-words text-[10px] font-semibold">
+                      {source.title || "출처"}
+                    </p>
+                    {source.note ? (
+                      <p className="mt-1 text-[9px] leading-5 text-[#858B96]">
+                        {source.note}
+                      </p>
+                    ) : null}
+                    {source.url ? (
+                      <a
+                        href={source.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-1 block break-all text-[9px] text-[#3157D5] underline underline-offset-2"
+                      >
+                        {source.url}
+                      </a>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          {run.provider ? (
+            <div className="mt-6 border-t border-[#ECEEF2] pt-4 text-[9px] text-[#A0A5AE]">
+              AI 실행 · {run.provider} · {run.model ?? "-"}
+              {run.provider === "mock" ? " · 테스트 비용 0원" : ""}
+            </div>
+          ) : null}
         </section>
       ) : (
         <section className="mt-5 rounded-[18px] border border-[#E7E9EE] bg-white p-5 sm:p-6">
           <div className="mb-5">
-            <p className="text-[13px] font-semibold">결과 제출</p>
+            <p className="text-[13px] font-semibold">수동 결과 제출</p>
             <p className="mt-1 text-[10px] text-[#8B919C]">
-              현재 STEP 19에서는 실행 결과를 수동 입력해 전체 검수 흐름을 먼저 검증합니다.
+              AI 실행을 사용하지 않거나 직접 결과를 입력해야 할 때 사용할 수 있습니다.
             </p>
           </div>
 
