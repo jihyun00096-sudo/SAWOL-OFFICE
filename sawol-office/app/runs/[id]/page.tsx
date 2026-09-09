@@ -29,10 +29,7 @@ export default async function RunDetailPage({
   const { id } = await params;
   const { supabase } = await requireSawolAdmin();
 
-  const [
-    { data: run },
-    { count: pendingApprovals },
-  ] = await Promise.all([
+  const [{ data: run }, { count: pendingApprovals }] = await Promise.all([
     supabase
       .from("task_runs")
       .select(
@@ -64,11 +61,18 @@ export default async function RunDetailPage({
   const configuredModel =
     provider === "mock"
       ? "sawol-mock-v1"
-      : process.env.OPENAI_MODEL || "gpt-5.6-luna";
+      : provider === "gemini"
+        ? process.env.GEMINI_MODEL || "gemini-3.8-flash"
+        : process.env.OPENAI_MODEL || "gpt-5.6-luna";
 
-  const webSearchEnabled = !["0", "false", "off", "no"].includes(
+  const openAiWebSearchEnabled = !["0", "false", "off", "no"].includes(
     (process.env.OPENAI_ENABLE_WEB_SEARCH || "true").toLowerCase(),
   );
+
+  const researchMode =
+    task?.task_type === "RESEARCH" &&
+    provider === "openai" &&
+    openAiWebSearchEnabled;
 
   return (
     <OfficeShell pendingApprovals={pendingApprovals ?? 0}>
@@ -102,8 +106,7 @@ export default async function RunDetailPage({
           <p className="text-[9px] text-[#9499A3]">실행 상태</p>
           <span
             className={`mt-2 inline-block rounded-full px-2.5 py-1 text-[9px] font-medium ${
-              runStatusTone[run.status] ??
-              "bg-[#F4F5F7] text-[#777D87]"
+              runStatusTone[run.status] ?? "bg-[#F4F5F7] text-[#777D87]"
             }`}
           >
             {runStatusLabel[run.status] ?? run.status}
@@ -136,11 +139,21 @@ export default async function RunDetailPage({
             provider={provider}
             providerLabel={providerLabel}
             model={configuredModel}
-            researchMode={
-              task?.task_type === "RESEARCH" && webSearchEnabled
-            }
+            researchMode={researchMode}
           />
         </div>
+      ) : null}
+
+      {provider === "gemini" && task?.task_type === "RESEARCH" && !run.result_body ? (
+        <section className="mt-3 rounded-[14px] border border-[#F0E1B9] bg-[#FFFBF1] p-4">
+          <p className="text-[10px] font-semibold text-[#84651F]">
+            무료 Gemini 테스트 · 최신 외부 검색 미사용
+          </p>
+          <p className="mt-1 text-[9px] leading-5 text-[#8C7950]">
+            현재 무료 테스트 구성에서는 Google Search grounding을 사용하지 않습니다.
+            최신 가격·정책·뉴스·공식 현황처럼 시점에 따라 달라지는 사실은 별도로 검증해주세요.
+          </p>
+        </section>
       ) : null}
 
       {run.status === "FAILED" && run.error_message ? (
@@ -239,10 +252,7 @@ export default async function RunDetailPage({
             </p>
           </div>
 
-          <TaskRunResultForm
-            runId={run.id}
-            taskId={task.id}
-          />
+          <TaskRunResultForm runId={run.id} taskId={task.id} />
         </section>
       )}
     </OfficeShell>

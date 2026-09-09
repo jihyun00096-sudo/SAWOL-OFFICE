@@ -15,7 +15,7 @@ export function AiExecuteButton({
   runId: string;
   runStatus: string;
   configured: boolean;
-  provider: "mock" | "openai";
+  provider: "mock" | "openai" | "gemini";
   providerLabel: string;
   model: string;
   researchMode: boolean;
@@ -27,6 +27,7 @@ export function AiExecuteButton({
 
   const canExecute = ["READY", "RUNNING", "FAILED"].includes(runStatus);
   const isMock = provider === "mock";
+  const isGemini = provider === "gemini";
 
   async function execute() {
     if (busy || !configured || !canExecute) return;
@@ -72,7 +73,7 @@ export function AiExecuteButton({
           AI Provider 설정 필요
         </p>
         <p className="mt-1 text-[10px] leading-5 text-[#9A6666]">
-          현재 Provider가 사용할 수 없는 상태입니다. .env.local 설정을 확인해주세요.
+          현재 Provider가 사용할 수 없는 상태입니다. .env.local의 Provider와 API Key를 확인해주세요.
         </p>
       </div>
     );
@@ -85,7 +86,9 @@ export function AiExecuteButton({
       className={`rounded-[14px] border p-4 ${
         isMock
           ? "border-[#DCE8DD] bg-[#F7FBF7]"
-          : "border-[#DCE4FF] bg-[#F8FAFF]"
+          : isGemini
+            ? "border-[#DDE6F8] bg-[#F8FAFF]"
+            : "border-[#DCE4FF] bg-[#F8FAFF]"
       }`}
     >
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -109,17 +112,25 @@ export function AiExecuteButton({
               </span>
             ) : null}
 
+            {isGemini ? (
+              <span className="rounded-full bg-[#EDF4FF] px-2 py-1 text-[8px] font-medium text-[#3157D5]">
+                무료 등급 지원 모델
+              </span>
+            ) : null}
+
             {!isMock && researchMode ? (
-              <span className="rounded-full bg-[#EAF5FF] px-2 py-1 text-[8px] text-[#34709B]">
-                웹 검색 사용
+              <span className="rounded-full bg-[#FFF5DD] px-2 py-1 text-[8px] text-[#8A6824]">
+                외부 웹 검색 없음
               </span>
             ) : null}
           </div>
 
-          <p className="mt-2 max-w-[650px] text-[10px] leading-5 text-[#70798D]">
+          <p className="mt-2 max-w-[680px] text-[10px] leading-5 text-[#70798D]">
             {isMock
               ? "실제 API 비용 없이 업무 실행 → 결과 저장 → 검수 흐름을 테스트합니다. 외부 사실이나 최신 정보는 실제로 조회하지 않습니다."
-              : "회사 기억, 프로젝트, 담당 부서·직원, 현재 업무 지시를 조합해 실제 AI 결과물을 생성합니다. 결과는 검수 대기로 이동합니다."}
+              : isGemini
+                ? "Gemini가 회사 기억, 프로젝트, 담당 직원, 업무 지시와 STEP22 인수인계를 읽고 실제 결과물을 생성합니다. 무료 테스트에서는 외부 Google 검색을 사용하지 않습니다."
+                : "회사 기억, 프로젝트, 담당 부서·직원, 현재 업무 지시를 조합해 실제 AI 결과물을 생성합니다. 결과는 검수 대기로 이동합니다."}
           </p>
         </div>
 
@@ -136,12 +147,16 @@ export function AiExecuteButton({
           {busy
             ? isMock
               ? "Mock AI가 테스트 중..."
-              : "AI가 업무 수행 중..."
+              : isGemini
+                ? "Gemini가 업무 수행 중..."
+                : "AI가 업무 수행 중..."
             : runStatus === "FAILED"
               ? "AI 실행 다시 시도"
               : isMock
                 ? "무료 Mock AI로 실행"
-                : "AI로 업무 실행"}
+                : isGemini
+                  ? "Gemini로 업무 실행"
+                  : "AI로 업무 실행"}
         </button>
       </div>
 
