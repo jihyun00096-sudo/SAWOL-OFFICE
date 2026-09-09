@@ -13,17 +13,12 @@ export function TaskDeleteButton({
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [confirmTitle, setConfirmTitle] = useState("");
+  const [confirmed, setConfirmed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
 
   async function deleteTask() {
-    if (busy) return;
-
-    if (confirmTitle.trim() !== taskTitle) {
-      setMessage("업무 제목을 정확히 입력해주세요.");
-      return;
-    }
+    if (busy || !confirmed) return;
 
     setBusy(true);
     setMessage("");
@@ -49,9 +44,7 @@ export function TaskDeleteButton({
         resultError,
         approvalError,
       });
-      setMessage(
-        "연결 데이터 확인 중 문제가 발생했습니다. results/approvals 연결 구조를 확인해주세요.",
-      );
+      setMessage("연결 데이터 확인 중 문제가 발생했습니다.");
       setBusy(false);
       return;
     }
@@ -60,15 +53,6 @@ export function TaskDeleteButton({
       setMessage(
         `삭제할 수 없습니다. 이 업무에 결과 ${resultCount ?? 0}건, 승인 ${approvalCount ?? 0}건이 연결되어 있습니다. 연결 데이터를 먼저 정리하거나 업무 상태를 '폐기'로 변경해주세요.`,
       );
-      setBusy(false);
-      return;
-    }
-
-    const finalConfirm = window.confirm(
-      `"${taskTitle}" 업무를 완전히 삭제합니다.\n\n삭제 후에는 복구할 수 없습니다. 계속할까요?`,
-    );
-
-    if (!finalConfirm) {
       setBusy(false);
       return;
     }
@@ -91,10 +75,16 @@ export function TaskDeleteButton({
     router.refresh();
   }
 
+  function openModal() {
+    setOpen(true);
+    setConfirmed(false);
+    setMessage("");
+  }
+
   function closeModal() {
     if (busy) return;
     setOpen(false);
-    setConfirmTitle("");
+    setConfirmed(false);
     setMessage("");
   }
 
@@ -102,11 +92,7 @@ export function TaskDeleteButton({
     <>
       <button
         type="button"
-        onClick={() => {
-          setOpen(true);
-          setConfirmTitle("");
-          setMessage("");
-        }}
+        onClick={openModal}
         className="flex h-10 w-full items-center justify-center rounded-[10px] border border-[#F0D2D2] bg-white px-4 text-[11px] font-semibold text-[#B14444] transition hover:bg-[#FFF7F7] sm:w-auto"
       >
         업무 삭제
@@ -132,7 +118,7 @@ export function TaskDeleteButton({
 
             <p className="mt-3 break-keep text-[11px] leading-5 text-[#777D87]">
               삭제된 업무는 복구할 수 없습니다. 결과물 또는 승인 데이터가 연결되어
-              있는 업무는 운영 이력 보호를 위해 삭제가 차단됩니다.
+              있는 경우 운영 이력 보호를 위해 삭제가 차단됩니다.
             </p>
 
             <div className="mt-5 rounded-[12px] bg-[#F7F8FA] p-3.5">
@@ -142,17 +128,22 @@ export function TaskDeleteButton({
               </p>
             </div>
 
-            <div className="mt-4">
-              <label className="mb-2 block text-[11px] font-semibold">
-                확인을 위해 업무 제목을 그대로 입력해주세요.
-              </label>
+            <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-[12px] border border-[#E8EAF0] bg-white p-3.5">
               <input
-                value={confirmTitle}
-                onChange={(event) => setConfirmTitle(event.target.value)}
-                className="h-11 w-full rounded-[10px] border border-[#E1E4E9] px-3 text-[12px] outline-none focus:border-[#B14444]"
-                placeholder={taskTitle}
+                type="checkbox"
+                checked={confirmed}
+                onChange={(event) => setConfirmed(event.target.checked)}
+                className="mt-0.5 h-4 w-4 accent-[#B14444]"
               />
-            </div>
+              <span>
+                <span className="block text-[11px] font-semibold text-[#343842]">
+                  확인했습니다
+                </span>
+                <span className="mt-1 block text-[10px] leading-5 text-[#8A909B]">
+                  삭제 후 복구할 수 없다는 내용을 확인했습니다.
+                </span>
+              </span>
+            </label>
 
             {message ? (
               <p className="mt-3 rounded-[10px] bg-[#FFF3F3] px-3 py-2.5 text-[10px] leading-5 text-[#A64242]">
@@ -173,7 +164,7 @@ export function TaskDeleteButton({
               <button
                 type="button"
                 onClick={deleteTask}
-                disabled={busy || confirmTitle.trim() !== taskTitle}
+                disabled={busy || !confirmed}
                 className="h-11 rounded-[10px] bg-[#B14444] text-[11px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40"
               >
                 {busy ? "확인 중..." : "완전 삭제"}
