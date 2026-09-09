@@ -21,4 +21,5 @@ export type SawolAiContext = {
   memories: Record<string, unknown>[];
   handoffs?: Record<string, unknown>[];
   rootTask?: Record<string, unknown> | null;
+  feedbacks?: Record<string, unknown>[];
 };

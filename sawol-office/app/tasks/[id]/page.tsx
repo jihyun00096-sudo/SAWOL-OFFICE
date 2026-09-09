@@ -9,7 +9,7 @@ import { TaskDeleteButton } from "@/components/sawol/task-delete-button";
 import { TaskEditForm } from "@/components/sawol/task-edit-form";
 import { TaskRunPanel } from "@/components/sawol/task-run-panel";
 import { TaskStageActions } from "@/components/sawol/task-stage-actions";
-import { WorkflowPlanner } from "@/components/sawol/workflow-planner";
+import { AutonomousOffice } from "@/components/sawol/autonomous-office";
 import { WorkflowBoard } from "@/components/sawol/workflow-board";
 import { WorkflowChildContext } from "@/components/sawol/workflow-child-context";
 import { buildEmployeeWorkloads, rankEmployeesForTask } from "@/lib/sawol/assignment";
@@ -110,8 +110,8 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ id:
         <div className="rounded-[16px] border border-[#E7E9EE] bg-white p-4"><p className="text-[10px] text-[#9297A1]">업무 유형</p><p className="mt-2 break-words text-[12px] font-medium">{taskTypeLabel[task.task_type] ?? task.task_type}</p></div>
       </section>
 
-      {!task.workflow_id && !task.parent_task_id ? (
-        <div className="mt-5"><WorkflowPlanner task={task as any} employees={(employees ?? []) as any} departments={(departments ?? []) as any} workloads={workloads} /></div>
+      {!task.parent_task_id ? (
+        <div className="mt-5"><AutonomousOffice task={task as any} employees={(employees ?? []) as any} departments={(departments ?? []) as any} workloads={workloads} hasWorkflow={Boolean(task.workflow_id)} /></div>
       ) : null}
 
       {task.is_workflow_root && workflow ? (
@@ -122,23 +122,21 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ id:
         <div className="mt-5"><WorkflowChildContext rootTask={rootTask} stepNo={task.workflow_step_no} dependencies={ownDependencies} handoffs={handoffs} /></div>
       ) : null}
 
-      <div className="mt-5">
-        <AssignmentAssistant taskId={task.id} currentEmployeeId={task.assigned_employee_id} currentAssignment={currentAssignment as any} candidates={candidates} />
-      </div>
-
-      <div className="mt-5">
-        <TaskRunPanel taskId={task.id} assignedEmployeeId={task.assigned_employee_id} taskStatus={task.status} runs={(runs ?? []) as any} isWorkflowRoot={Boolean(task.is_workflow_root)} unmetDependencies={unmetDependencies} />
-      </div>
-
-      <div className="mt-5">
-        <TaskStageActions taskId={task.id} currentStatus={task.status} requiresCeoApproval={Boolean(task.requires_ceo_approval)} isWorkflowRoot={Boolean(task.is_workflow_root)} unmetDependencies={unmetDependencies.length} />
-      </div>
-
-      <div className="mt-5">
-        <DetailSection title="업무 관리" description="업무 내용, 소속 프로젝트, 담당 부서와 직원을 직접 관리합니다.">
-          <TaskEditForm task={task as any} projects={(projects ?? []) as any} departments={(departments ?? []) as any} employees={(employees ?? []) as any} />
-        </DetailSection>
-      </div>
+      {!task.parent_task_id ? (
+        <details className="mt-5 rounded-[18px] border border-[#E7E9EE] bg-white">
+          <summary className="cursor-pointer list-none px-5 py-4 text-[11px] font-semibold text-[#6F7682]">수동 관리 · 오류 복구가 필요할 때만 열기</summary>
+          <div className="space-y-5 border-t border-[#ECEEF2] p-5">
+            <AssignmentAssistant taskId={task.id} currentEmployeeId={task.assigned_employee_id} currentAssignment={currentAssignment as any} candidates={candidates} />
+            <TaskRunPanel taskId={task.id} assignedEmployeeId={task.assigned_employee_id} taskStatus={task.status} runs={(runs ?? []) as any} isWorkflowRoot={Boolean(task.is_workflow_root)} unmetDependencies={unmetDependencies} />
+            <TaskStageActions taskId={task.id} currentStatus={task.status} requiresCeoApproval={Boolean(task.requires_ceo_approval)} isWorkflowRoot={Boolean(task.is_workflow_root)} unmetDependencies={unmetDependencies.length} />
+            <DetailSection title="업무 관리" description="업무 내용, 소속 프로젝트, 담당 부서와 직원을 직접 관리합니다.">
+              <TaskEditForm task={task as any} projects={(projects ?? []) as any} departments={(departments ?? []) as any} employees={(employees ?? []) as any} />
+            </DetailSection>
+          </div>
+        </details>
+      ) : (
+        <div className="mt-5 rounded-[16px] border border-[#E7E9EE] bg-white p-4 text-[10px] leading-5 text-[#737A85]">이 화면은 AI 조직 내부 단계입니다. 대표가 직접 실행할 필요가 없으며 상위 업무의 AI 자율 오피스가 자동으로 이어서 처리합니다.</div>
+      )}
     </OfficeShell>
   );
 }

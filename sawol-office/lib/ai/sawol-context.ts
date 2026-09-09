@@ -61,6 +61,7 @@ export function buildSawolUserPrompt(context: SawolAiContext) {
   const department = compactRow(context.department, ["code", "name", "department_name", "description"]);
   const memoryRows = context.memories.slice(0, 12).map((memory) => compactRow(memory, ["memory_code", "title", "content", "summary", "category", "importance", "priority", "scope"])).filter(Boolean);
   const handoffRows = (context.handoffs ?? []).slice(0, 8).map((handoff) => compactRow(handoff, ["title", "summary", "content", "from_task_id", "created_at"])).filter(Boolean);
+  const feedbackRows = (context.feedbacks ?? []).slice(0, 3).map((feedback) => compactRow(feedback, ["reason", "created_at"])).filter(Boolean);
 
   return `
 아래 SAWOL OFFICE 업무를 수행하세요.
@@ -83,6 +84,9 @@ ${employee ? JSON.stringify(employee, null, 2) : "미배정"}
 [이전 단계 인수인계]
 ${handoffRows.length ? JSON.stringify(handoffRows, null, 2) : "선행 단계 인수인계 없음"}
 
+[대표 반려·수정 피드백]
+${feedbackRows.length ? JSON.stringify(feedbackRows, null, 2) : "현재 반려 피드백 없음"}
+
 [회사 활성 기억]
 ${memoryRows.length ? JSON.stringify(memoryRows, null, 2) : "사용 가능한 활성 기억 없음"}
 
@@ -90,6 +94,7 @@ ${memoryRows.length ? JSON.stringify(memoryRows, null, 2) : "사용 가능한 �
 - 현재 업무의 제목과 설명을 직접적인 완료 기준으로 취급합니다.
 - 상위 대표 업무가 있으면 전체 목적을 벗어나지 않습니다.
 - 인수인계 결과가 있으면 그 내용을 입력 자료로 사용하고, 현재 단계에서 필요한 추가 작업에 집중합니다.
+- 대표 반려 피드백이 있으면 그 내용을 최우선 수정 기준으로 반영하고 무엇을 고쳤는지 결과에 드러나게 합니다.
 - 프로젝트가 연결되어 있으면 프로젝트 목적과 원하는 결과를 함께 반영합니다.
 - 활성 기억은 회사 운영 선호와 기준으로 참고합니다.
 - 결과 제목은 산출물을 명확하게 식별할 수 있어야 합니다.

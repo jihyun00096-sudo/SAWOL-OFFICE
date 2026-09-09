@@ -13,15 +13,16 @@ export default async function TasksPage() {
     supabase
       .from("tasks")
       .select(`
-        id, task_code, title, description, task_type, status, priority, created_at,
+        id, task_code, title, description, task_type, status, priority, created_at, parent_task_id, workflow_id, is_workflow_root,
         employees:assigned_employee_id(name, employee_code),
         departments:assigned_department_id(name)
       `)
+      .is("parent_task_id", null)
       .order("created_at", { ascending: false }),
     supabase
-      .from("approvals")
+      .from("tasks")
       .select("id", { count: "exact", head: true })
-      .eq("status", "PENDING"),
+      .eq("status", "PENDING_APPROVAL"),
   ]);
 
   return (

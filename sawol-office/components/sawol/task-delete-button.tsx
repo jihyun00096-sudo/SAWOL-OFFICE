@@ -57,12 +57,26 @@ export function TaskDeleteButton({
     }
 
     if (taskMeta?.workflow_id) {
-      setMessage(
-        taskMeta.is_workflow_root
-          ? "삭제할 수 없습니다. 이 업무는 STEP22 협업 워크플로의 상위 업무입니다. 협업 이력 보호를 위해 직접 삭제가 차단됩니다."
-          : "삭제할 수 없습니다. 이 업무는 STEP22 협업 워크플로의 하위 단계입니다. 의존성과 인수인계 이력 보호를 위해 직접 삭제가 차단됩니다.",
+      if (!taskMeta.is_workflow_root) {
+        setMessage("이 업무는 AI 협업 내부 단계입니다. 상위 업무에서 전체 워크플로를 삭제해주세요.");
+        setBusy(false);
+        return;
+      }
+
+      const { error: workflowDeleteError } = await supabase.rpc(
+        "sawol_delete_workflow_tree",
+        { p_root_task_id: taskId },
       );
-      setBusy(false);
+
+      if (workflowDeleteError) {
+        console.error(workflowDeleteError);
+        setMessage(`협업 업무 전체 삭제에 실패했습니다. ${workflowDeleteError.message}`);
+        setBusy(false);
+        return;
+      }
+
+      router.replace("/tasks");
+      router.refresh();
       return;
     }
 
@@ -134,8 +148,7 @@ export function TaskDeleteButton({
             </h2>
 
             <p className="mt-3 break-keep text-[11px] leading-5 text-[#777D87]">
-              삭제된 업무는 복구할 수 없습니다. 결과물 또는 승인 데이터가 연결되어
-              있는 경우 운영 이력 보호를 위해 삭제가 차단됩니다.
+              삭제된 업무는 복구할 수 없습니다. AI 협업 상위 업무인 경우 연결된 내부 단계와 실행 이력도 함께 정리됩니다.
             </p>
 
             <div className="mt-5 rounded-[12px] bg-[#F7F8FA] p-3.5">
