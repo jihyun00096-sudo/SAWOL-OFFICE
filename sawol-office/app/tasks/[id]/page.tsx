@@ -6,12 +6,14 @@ import { PageHeader } from "@/components/sawol/page-header";
 import { StatusBadge } from "@/components/sawol/status-badge";
 import { TaskDeleteButton } from "@/components/sawol/task-delete-button";
 import { TaskEditForm } from "@/components/sawol/task-edit-form";
+import { TaskRunPanel } from "@/components/sawol/task-run-panel";
 import { TaskStageActions } from "@/components/sawol/task-stage-actions";
 import {
   labelOf,
   priorityLabel,
   taskStatusLabel,
 } from "@/lib/sawol/labels";
+import { executionStatusLabel } from "@/lib/sawol/execution";
 import { requireSawolAdmin } from "@/lib/auth/require-sawol-admin";
 
 export const dynamic = "force-dynamic";
@@ -42,6 +44,7 @@ export default async function TaskDetailPage({
     { data: projects },
     { data: departments },
     { data: employees },
+    { data: runs },
     { count: pendingApprovals },
   ] = await Promise.all([
     supabase.from("tasks").select("*").eq("id", id).maybeSingle(),
@@ -60,9 +63,16 @@ export default async function TaskDetailPage({
       .eq("is_active", true)
       .order("employee_code"),
     supabase
-      .from("approvals")
+      .from("task_runs")
+      .select(
+        "id, run_code, status, employee_id, started_at, submitted_at, completed_at, result_title, result_summary, error_message, created_at",
+      )
+      .eq("task_id", id)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("tasks")
       .select("id", { count: "exact", head: true })
-      .eq("status", "PENDING"),
+      .eq("status", "PENDING_APPROVAL"),
   ]);
 
   if (!task) notFound();
@@ -83,6 +93,13 @@ export default async function TaskDetailPage({
             </Link>
 
             <Link
+              href="/runs"
+              className="flex h-10 items-center justify-center rounded-[10px] border border-[#E1E4E9] bg-white px-4 text-[11px] font-semibold text-[#656B75]"
+            >
+              실행 기록
+            </Link>
+
+            <Link
               href="/tasks"
               className="flex h-10 items-center justify-center rounded-[10px] border border-[#E1E4E9] bg-white px-4 text-[11px] font-semibold text-[#656B75]"
             >
@@ -100,7 +117,10 @@ export default async function TaskDetailPage({
           <div className="mt-2">
             <StatusBadge
               value={task.status}
-              label={labelOf(taskStatusLabel, task.status)}
+              label={
+                executionStatusLabel[task.status] ??
+                labelOf(taskStatusLabel, task.status)
+              }
             />
           </div>
         </div>
@@ -122,6 +142,15 @@ export default async function TaskDetailPage({
           </p>
         </div>
       </section>
+
+      <div className="mt-5">
+        <TaskRunPanel
+          taskId={task.id}
+          assignedEmployeeId={task.assigned_employee_id}
+          taskStatus={task.status}
+          runs={(runs ?? []) as any}
+        />
+      </div>
 
       <div className="mt-5">
         <TaskStageActions
