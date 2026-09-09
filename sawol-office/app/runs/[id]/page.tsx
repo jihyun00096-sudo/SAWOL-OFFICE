@@ -58,11 +58,17 @@ export default async function RunDetailPage({
   const providerLabel = getAiProviderDisplayName(provider);
   const configured = isAiProviderConfigured(provider);
 
+  const geminiSearchEnabled = !["0", "false", "off", "no"].includes(
+    (process.env.GEMINI_ENABLE_SEARCH || "true").toLowerCase(),
+  );
+
   const configuredModel =
     provider === "mock"
       ? "sawol-mock-v1"
       : provider === "gemini"
-        ? process.env.GEMINI_MODEL || "gemini-3.8-flash"
+        ? task?.task_type === "RESEARCH" && geminiSearchEnabled
+          ? process.env.GEMINI_RESEARCH_MODEL || "gemini-2.5-flash-lite"
+          : process.env.GEMINI_MODEL || "gemini-3.5-flash-lite"
         : process.env.OPENAI_MODEL || "gpt-5.6-luna";
 
   const openAiWebSearchEnabled = !["0", "false", "off", "no"].includes(
@@ -142,18 +148,6 @@ export default async function RunDetailPage({
             researchMode={researchMode}
           />
         </div>
-      ) : null}
-
-      {provider === "gemini" && task?.task_type === "RESEARCH" && !run.result_body ? (
-        <section className="mt-3 rounded-[14px] border border-[#F0E1B9] bg-[#FFFBF1] p-4">
-          <p className="text-[10px] font-semibold text-[#84651F]">
-            무료 Gemini 테스트 · 최신 외부 검색 미사용
-          </p>
-          <p className="mt-1 text-[9px] leading-5 text-[#8C7950]">
-            현재 무료 테스트 구성에서는 Google Search grounding을 사용하지 않습니다.
-            최신 가격·정책·뉴스·공식 현황처럼 시점에 따라 달라지는 사실은 별도로 검증해주세요.
-          </p>
-        </section>
       ) : null}
 
       {run.status === "FAILED" && run.error_message ? (
