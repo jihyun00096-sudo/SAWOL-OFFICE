@@ -19,4 +19,6 @@ export type SawolAiContext = {
   department: Record<string, unknown> | null;
   employee: Record<string, unknown> | null;
   memories: Record<string, unknown>[];
+  handoffs?: Record<string, unknown>[];
+  rootTask?: Record<string, unknown> | null;
 };

@@ -26,9 +26,15 @@ export function TaskDeleteButton({
     const supabase = createClient();
 
     const [
+      { data: taskMeta, error: taskMetaError },
       { count: resultCount, error: resultError },
       { count: approvalCount, error: approvalError },
     ] = await Promise.all([
+      supabase
+        .from("tasks")
+        .select("workflow_id, is_workflow_root, parent_task_id")
+        .eq("id", taskId)
+        .maybeSingle(),
       supabase
         .from("results")
         .select("id", { count: "exact", head: true })
@@ -39,12 +45,23 @@ export function TaskDeleteButton({
         .eq("task_id", taskId),
     ]);
 
-    if (resultError || approvalError) {
+    if (taskMetaError || resultError || approvalError) {
       console.error("Task dependency check failed", {
+        taskMetaError,
         resultError,
         approvalError,
       });
       setMessage("연결 데이터 확인 중 문제가 발생했습니다.");
+      setBusy(false);
+      return;
+    }
+
+    if (taskMeta?.workflow_id) {
+      setMessage(
+        taskMeta.is_workflow_root
+          ? "삭제할 수 없습니다. 이 업무는 STEP22 협업 워크플로의 상위 업무입니다. 협업 이력 보호를 위해 직접 삭제가 차단됩니다."
+          : "삭제할 수 없습니다. 이 업무는 STEP22 협업 워크플로의 하위 단계입니다. 의존성과 인수인계 이력 보호를 위해 직접 삭제가 차단됩니다.",
+      );
       setBusy(false);
       return;
     }

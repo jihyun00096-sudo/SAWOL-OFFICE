@@ -85,6 +85,8 @@ export async function POST(
     departmentResult,
     employeeResult,
     memoryResult,
+    handoffResult,
+    rootTaskResult,
   ] = await Promise.all([
     task.project_id
       ? supabase.from("projects").select("*").eq("id", task.project_id).maybeSingle()
@@ -96,6 +98,12 @@ export async function POST(
       ? supabase.from("employees").select("*").eq("id", run.employee_id || task.assigned_employee_id).maybeSingle()
       : Promise.resolve({ data: null, error: null }),
     supabase.from("memories").select("*").eq("status", "ACTIVE").limit(12),
+    task.workflow_id && !task.is_workflow_root
+      ? supabase.from("task_handoffs").select("id, from_task_id, to_task_id, title, summary, content, created_at").eq("to_task_id", task.id).eq("status", "AVAILABLE").order("created_at", { ascending: true })
+      : Promise.resolve({ data: [], error: null }),
+    task.parent_task_id
+      ? supabase.from("tasks").select("task_code, title, description, task_type, priority").eq("id", task.parent_task_id).maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
   ]);
 
   const context: SawolAiContext = {
@@ -104,6 +112,8 @@ export async function POST(
     department: (departmentResult.data as Record<string, unknown> | null) ?? null,
     employee: (employeeResult.data as Record<string, unknown> | null) ?? null,
     memories: (memoryResult.data as Record<string, unknown>[] | null) ?? [],
+    handoffs: (handoffResult.data as Record<string, unknown>[] | null) ?? [],
+    rootTask: (rootTaskResult.data as Record<string, unknown> | null) ?? null,
   };
 
   const now = new Date().toISOString();

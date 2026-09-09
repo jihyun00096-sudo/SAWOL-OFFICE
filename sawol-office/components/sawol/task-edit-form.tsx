@@ -15,6 +15,8 @@ type Task = {
   assigned_department_id: string | null;
   assigned_employee_id: string | null;
   requires_ceo_approval: boolean;
+  workflow_id?: string | null;
+  is_workflow_root?: boolean;
 };
 
 type Option = {
@@ -49,7 +51,9 @@ export function TaskEditForm({
     if (busy) return;
 
     const form = new FormData(event.currentTarget);
-    const status = String(form.get("status") ?? task.status);
+    const status = task.workflow_id
+      ? task.status
+      : String(form.get("status") ?? task.status);
 
     if (
       ["CANCELLED", "CANCELED"].includes(status) &&
@@ -195,7 +199,12 @@ export function TaskEditForm({
 
         <div>
           <label className="mb-2 block text-[11px] font-semibold">상태</label>
-          <select name="status" defaultValue={task.status} className={input}>
+          <select
+            name="status"
+            defaultValue={task.status}
+            className={input}
+            disabled={Boolean(task.workflow_id)}
+          >
             <option value="WAITING">대기</option>
             <option value="WAITING_FOR_DATA">자료 대기</option>
             <option value="IN_PROGRESS">진행 중</option>
@@ -207,6 +216,11 @@ export function TaskEditForm({
             <option value="CANCELLED">폐기</option>
             <option value="ERROR">오류</option>
           </select>
+          {task.workflow_id ? (
+            <p className="mt-1.5 text-[9px] leading-4 text-[#A06D19]">
+              협업 업무의 상태는 실행 흐름에서 관리됩니다.
+            </p>
+          ) : null}
         </div>
 
         <div>

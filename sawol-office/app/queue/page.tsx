@@ -28,6 +28,9 @@ export default async function QueuePage() {
         task_type,
         requires_ceo_approval,
         assigned_employee_id,
+        workflow_step_no,
+        is_workflow_root,
+        parent:parent_task_id(title, task_code),
         created_at,
         employees:assigned_employee_id(name),
         departments:assigned_department_id(name)
