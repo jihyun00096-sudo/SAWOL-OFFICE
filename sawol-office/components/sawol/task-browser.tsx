@@ -22,6 +22,19 @@ type Task = {
   departments: { name: string } | null;
 };
 
+const taskTypeLabel: Record<string, string> = {
+  RESEARCH: "리서치",
+  PLANNING: "기획",
+  PRODUCTION: "제작",
+  EDIT: "수정",
+  ANALYSIS: "분석",
+  OPERATION: "운영",
+  STUDY: "학습",
+  DEVELOPMENT: "개발",
+  DESIGN: "디자인",
+  OTHER: "기타",
+};
+
 export function TaskBrowser({ tasks }: { tasks: Task[] }) {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("");
@@ -36,7 +49,8 @@ export function TaskBrowser({ tasks }: { tasks: Task[] }) {
         task.title.toLowerCase().includes(q) ||
         task.task_code.toLowerCase().includes(q) ||
         (task.description ?? "").toLowerCase().includes(q) ||
-        task.task_type.toLowerCase().includes(q);
+        task.task_type.toLowerCase().includes(q) ||
+        (taskTypeLabel[task.task_type] ?? "").toLowerCase().includes(q);
 
       return (
         searchMatch &&
@@ -104,7 +118,9 @@ export function TaskBrowser({ tasks }: { tasks: Task[] }) {
                 value={task.priority}
                 label={labelOf(priorityLabel, task.priority)}
               />
-              <span className="text-[10px] text-[#9A9FAA]">{task.task_type}</span>
+              <span className="text-[10px] text-[#9A9FAA]">
+                {taskTypeLabel[task.task_type] ?? task.task_type}
+              </span>
             </div>
 
             <h2 className="mt-3 text-[14px] font-semibold">{task.title}</h2>

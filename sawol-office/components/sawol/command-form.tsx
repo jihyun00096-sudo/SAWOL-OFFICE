@@ -1,9 +1,14 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { createHumanCode } from "@/lib/sawol/code";
+import {
+  analyzeSecretaryCommand,
+  type SecretaryAnalysis,
+} from "@/lib/sawol/secretary";
+import { SecretaryAnalysisCard } from "@/components/sawol/secretary-analysis-card";
 
 type Department = {
   id: string;
@@ -12,20 +17,146 @@ type Department = {
   department_type: string;
 };
 
-export function CommandForm({ departments }: { departments: Department[] }) {
+type Project = {
+  id: string;
+  name: string;
+};
+
+type Employee = {
+  id: string;
+  name: string;
+  employee_code: string;
+};
+
+const taskTypeOptions = [
+  ["RESEARCH", "리서치"],
+  ["PLANNING", "기획"],
+  ["PRODUCTION", "제작"],
+  ["EDIT", "수정"],
+  ["ANALYSIS", "분석"],
+  ["OPERATION", "운영"],
+  ["STUDY", "학습"],
+  ["DEVELOPMENT", "개발"],
+  ["DESIGN", "디자인"],
+  ["OTHER", "기타"],
+] as const;
+
+const priorityOptions = [
+  ["URGENT", "긴급"],
+  ["HIGH", "높음"],
+  ["NORMAL", "보통"],
+  ["LOW", "낮음"],
+] as const;
+
+export function CommandForm({
+  departments,
+  projects,
+  employees,
+}: {
+  departments: Department[];
+  projects: Project[];
+  employees: Employee[];
+}) {
   const router = useRouter();
+  const formRef = useRef<HTMLFormElement | null>(null);
+
+  const [analysis, setAnalysis] = useState<SecretaryAnalysis | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState("");
   const [success, setSuccess] = useState(false);
+
+  const [taskType, setTaskType] = useState("OTHER");
+  const [priority, setPriority] = useState("NORMAL");
+  const [projectId, setProjectId] = useState("");
+  const [departmentId, setDepartmentId] = useState("");
+  const [employeeId, setEmployeeId] = useState("");
+  const [requiresApproval, setRequiresApproval] = useState(false);
+
+  const projectName = useMemo(
+    () => projects.find((project) => project.id === projectId)?.name,
+    [projects, projectId],
+  );
+
+  const departmentName = useMemo(
+    () =>
+      departments.find((department) => department.id === departmentId)?.name,
+    [departments, departmentId],
+  );
+
+  const employeeName = useMemo(
+    () => employees.find((employee) => employee.id === employeeId)?.name,
+    [employees, employeeId],
+  );
+
+  function readCommand() {
+    if (!formRef.current) return null;
+
+    const form = new FormData(formRef.current);
+    const title = String(form.get("title") ?? "").trim();
+    const description = String(form.get("description") ?? "").trim();
+
+    return {
+      form,
+      title,
+      description,
+    };
+  }
+
+  function analyze() {
+    const command = readCommand();
+
+    if (!command) return;
+
+    if (!command.title || !command.description) {
+      setSuccess(false);
+      setMessage("업무 제목과 업무 내용을 먼저 입력해주세요.");
+      return;
+    }
+
+    const nextAnalysis = analyzeSecretaryCommand({
+      title: command.title,
+      description: command.description,
+      projects,
+      departments,
+    });
+
+    setAnalysis(nextAnalysis);
+    setTaskType(nextAnalysis.taskType);
+    setPriority(nextAnalysis.priority);
+    setProjectId(nextAnalysis.projectId);
+    setDepartmentId(nextAnalysis.departmentId);
+    setEmployeeId(nextAnalysis.employeeId);
+    setRequiresApproval(nextAnalysis.requiresCeoApproval);
+    setSuccess(true);
+    setMessage(
+      "비서실 분석이 완료되었습니다. 아래 제안값을 확인하거나 수정해주세요.",
+    );
+  }
+
+  function resetAll() {
+    formRef.current?.reset();
+    setAnalysis(null);
+    setTaskType("OTHER");
+    setPriority("NORMAL");
+    setProjectId("");
+    setDepartmentId("");
+    setEmployeeId("");
+    setRequiresApproval(false);
+    setMessage("");
+    setSuccess(false);
+  }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     if (submitting) return;
 
-    // IMPORTANT:
-    // React's event.currentTarget should not be referenced after await.
-    // Keep a stable reference to the form before any async operation.
+    if (!analysis) {
+      setSuccess(false);
+      setMessage("먼저 비서실장에게 분석을 요청해주세요.");
+      return;
+    }
+
     const formElement = event.currentTarget;
     const form = new FormData(formElement);
 
@@ -34,7 +165,7 @@ export function CommandForm({ departments }: { departments: Department[] }) {
 
     if (!title || !description) {
       setSuccess(false);
-      setMessage("업무 제목과 업무 내용을 입력해주세요.");
+      setMessage("업무 제목과 업무 내용은 필수입니다.");
       return;
     }
 
@@ -42,159 +173,324 @@ export function CommandForm({ departments }: { departments: Department[] }) {
     setMessage("");
 
     const supabase = createClient();
-    const departmentId = String(form.get("department_id") ?? "") || null;
+
+    const requestedResult =
+      String(form.get("expected_result") ?? "").trim() || null;
 
     const { error } = await supabase.from("tasks").insert({
       task_code: createHumanCode("TASK"),
       title,
       description,
-      task_type: String(form.get("task_type") ?? "OTHER"),
-      priority: String(form.get("priority") ?? "NORMAL"),
-      assigned_department_id: departmentId,
-      requires_ceo_approval: form.get("requires_ceo_approval") === "on",
+      task_type: taskType,
+      priority,
+      project_id: projectId || null,
+      assigned_department_id: departmentId || null,
+      assigned_employee_id: employeeId || null,
+      requires_ceo_approval: requiresApproval,
       status: "WAITING",
       review_level: 0,
       input_data: {
         source: "CEO_COMMAND",
+        secretary_analysis: {
+          engine: "STEP17_RULE_ENGINE",
+          confidence: analysis.confidence,
+          rationale: analysis.rationale,
+          suggested_steps: analysis.steps,
+          suggested_task_type: analysis.taskType,
+          suggested_priority: analysis.priority,
+          suggested_project_id: analysis.projectId || null,
+          suggested_department_id: analysis.departmentId || null,
+          suggested_employee_id: analysis.employeeId || null,
+          suggested_requires_ceo_approval:
+            analysis.requiresCeoApproval,
+          representative_final_choice: {
+            task_type: taskType,
+            priority,
+            project_id: projectId || null,
+            department_id: departmentId || null,
+            employee_id: employeeId || null,
+            requires_ceo_approval: requiresApproval,
+          },
+        },
       },
       output_requirements: {
-        requested_result: String(form.get("expected_result") ?? "").trim(),
+        requested_result: requestedResult,
+        secretary_plan: analysis.steps,
       },
     });
 
     if (error) {
       console.error(error);
       setSuccess(false);
-      setMessage("업무 등록에 실패했습니다. 입력값과 Supabase 연결을 확인해주세요.");
+      setMessage(
+        "업무 등록에 실패했습니다. 입력값 또는 Supabase 연결을 확인해주세요.",
+      );
       setSubmitting(false);
       return;
     }
 
     setSuccess(true);
-    setMessage("업무가 등록되었습니다. 전체 업무에서 확인할 수 있습니다.");
+    setMessage("대표 확인이 완료되어 업무가 등록되었습니다.");
 
-    // Use the stable form reference captured before await.
     formElement.reset();
+    setAnalysis(null);
+    setTaskType("OTHER");
+    setPriority("NORMAL");
+    setProjectId("");
+    setDepartmentId("");
+    setEmployeeId("");
+    setRequiresApproval(false);
 
     router.refresh();
     setSubmitting(false);
   }
 
   const input =
-    "h-11 w-full rounded-[11px] border border-[#E1E4E9] bg-white px-3.5 text-[13px] outline-none transition focus:border-[#3157D5] focus:ring-4 focus:ring-[#3157D5]/[0.07]";
+    "h-11 w-full rounded-[11px] border border-[#E1E4E9] bg-white px-3.5 text-[12px] outline-none transition focus:border-[#3157D5] focus:ring-4 focus:ring-[#3157D5]/[0.06]";
 
   return (
-    <form onSubmit={submit} className="rounded-[20px] border border-[#E7E9EE] bg-white p-5 sm:p-6">
-      <div className="grid gap-5">
-        <div>
-          <label className="mb-2 block text-[12px] font-semibold">업무 제목 *</label>
-          <input
-            name="title"
-            className={input}
-            placeholder="예: 타로 기록 서비스 경쟁사이트 조사"
-            maxLength={120}
-          />
-        </div>
-
-        <div>
-          <label className="mb-2 block text-[12px] font-semibold">업무 내용 *</label>
-          <textarea
-            name="description"
-            rows={7}
-            className="w-full resize-y rounded-[12px] border border-[#E1E4E9] bg-white px-3.5 py-3 text-[13px] leading-6 outline-none transition focus:border-[#3157D5] focus:ring-4 focus:ring-[#3157D5]/[0.07]"
-            placeholder="무엇을 조사하고, 만들고, 확인해야 하는지 자연스럽게 적어주세요."
-          />
-        </div>
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <label className="mb-2 block text-[12px] font-semibold">업무 유형</label>
-            <select name="task_type" className={input} defaultValue="OTHER">
-              <option value="RESEARCH">리서치</option>
-              <option value="PLANNING">기획</option>
-              <option value="PRODUCTION">제작</option>
-              <option value="EDIT">수정</option>
-              <option value="ANALYSIS">분석</option>
-              <option value="OPERATION">운영</option>
-              <option value="STUDY">학습</option>
-              <option value="DEVELOPMENT">개발</option>
-              <option value="DESIGN">디자인</option>
-              <option value="OTHER">기타</option>
-            </select>
+    <form ref={formRef} onSubmit={submit} className="space-y-4">
+      <section className="rounded-[20px] border border-[#E7E9EE] bg-white p-5 sm:p-6">
+        <div className="flex items-start gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#EEF2FF] text-[11px] font-bold text-[#3157D5]">
+            윤
           </div>
 
           <div>
-            <label className="mb-2 block text-[12px] font-semibold">우선순위</label>
-            <select name="priority" className={input} defaultValue="NORMAL">
-              <option value="URGENT">긴급</option>
-              <option value="HIGH">높음</option>
-              <option value="NORMAL">보통</option>
-              <option value="LOW">낮음</option>
-            </select>
+            <p className="text-[13px] font-semibold">윤서진 비서실장</p>
+            <p className="mt-1 break-keep text-[10px] leading-5 text-[#8B919C]">
+              대표님의 지시를 먼저 읽고 업무 성격과 배정안을 정리하겠습니다.
+              분석 단계에서는 실제 업무가 생성되지 않습니다.
+            </p>
           </div>
         </div>
 
-        <div>
-          <label className="mb-2 block text-[12px] font-semibold">담당 부서</label>
-          <select name="department_id" className={input} defaultValue="">
-            <option value="">비서실 자동배정 대기</option>
-            {departments.map((department) => (
-              <option key={department.id} value={department.id}>
-                {department.name}
-              </option>
-            ))}
-          </select>
-          <p className="mt-1.5 text-[10px] text-[#999EA7]">
-            선택하지 않으면 향후 비서실 AI가 자동배정합니다.
-          </p>
-        </div>
-
-        <div>
-          <label className="mb-2 block text-[12px] font-semibold">원하는 결과물</label>
-          <input
-            name="expected_result"
-            className={input}
-            placeholder="예: 경쟁사 10곳 비교표 + 핵심 시사점"
-            maxLength={300}
-          />
-        </div>
-
-        <label className="flex cursor-pointer items-start gap-3 rounded-[12px] bg-[#F7F8FA] p-3.5">
-          <input
-            type="checkbox"
-            name="requires_ceo_approval"
-            className="mt-0.5 h-4 w-4 accent-[#3157D5]"
-          />
-          <span>
-            <span className="block text-[12px] font-medium">완료 후 대표 승인 필요</span>
-            <span className="mt-1 block text-[10px] leading-4 text-[#9297A1]">
-              중요한 결과물이라면 승인 단계를 지정합니다.
-            </span>
-          </span>
-        </label>
-
-        {message ? (
-          <div
-            className={`rounded-[11px] px-4 py-3 text-[12px] ${
-              success
-                ? "bg-[#EEF8F2] text-[#2C7B50]"
-                : "bg-[#FFF1F1] text-[#B14444]"
-            }`}
-          >
-            {message}
+        <div className="mt-5 grid gap-5">
+          <div>
+            <label className="mb-2 block text-[11px] font-semibold">
+              무엇을 해야 하나요? *
+            </label>
+            <input
+              name="title"
+              className={input}
+              placeholder="예: 신통기획 강의 상세페이지 경쟁 강의 조사"
+              maxLength={160}
+              onChange={() => analysis && setAnalysis(null)}
+            />
           </div>
-        ) : null}
 
-        <div className="flex justify-end">
+          <div>
+            <label className="mb-2 block text-[11px] font-semibold">
+              자세히 알려주세요 *
+            </label>
+            <textarea
+              name="description"
+              rows={7}
+              className="w-full resize-y rounded-[12px] border border-[#E1E4E9] bg-white px-3.5 py-3 text-[12px] leading-6 outline-none transition focus:border-[#3157D5] focus:ring-4 focus:ring-[#3157D5]/[0.06]"
+              placeholder="조사 범위, 만들어야 할 것, 지켜야 할 조건 등을 평소 말하듯 적어주세요."
+              onChange={() => analysis && setAnalysis(null)}
+            />
+          </div>
+
+          <div>
+            <label className="mb-2 block text-[11px] font-semibold">
+              원하는 결과물이 있다면
+            </label>
+            <input
+              name="expected_result"
+              className={input}
+              placeholder="예: 경쟁 강의 10개 비교표 + 상세페이지 구성안"
+              maxLength={300}
+            />
+          </div>
+
           <button
-            type="submit"
-            disabled={submitting}
-            className="h-11 w-full rounded-[11px] bg-[#17181C] px-5 text-[12px] font-semibold text-white transition hover:bg-[#292B31] disabled:opacity-50 sm:w-auto"
+            type="button"
+            onClick={analyze}
+            className="h-11 w-full rounded-[11px] bg-[#3157D5] px-5 text-[12px] font-semibold text-white transition hover:bg-[#294BC0] sm:w-auto"
           >
-            {submitting ? "등록 중..." : "업무 등록"}
+            {analysis ? "다시 분석하기" : "비서실장에게 분석 요청"}
           </button>
         </div>
-      </div>
+      </section>
+
+      {analysis ? (
+        <>
+          <SecretaryAnalysisCard
+            analysis={{
+              ...analysis,
+              taskType,
+              priority,
+              projectId,
+              departmentId,
+              employeeId,
+              requiresCeoApproval: requiresApproval,
+            }}
+            projectName={projectName}
+            departmentName={departmentName}
+            employeeName={employeeName}
+          />
+
+          <section className="rounded-[20px] border border-[#E7E9EE] bg-white p-5 sm:p-6">
+            <div>
+              <p className="text-[13px] font-semibold">대표 확인</p>
+              <p className="mt-1 text-[10px] leading-5 text-[#8C929D]">
+                비서실의 제안입니다. 필요한 항목은 직접 바꾼 뒤 업무를 등록해주세요.
+              </p>
+            </div>
+
+            <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <div>
+                <label className="mb-2 block text-[10px] font-semibold">
+                  업무 유형
+                </label>
+                <select
+                  value={taskType}
+                  onChange={(event) => setTaskType(event.target.value)}
+                  className={input}
+                >
+                  {taskTypeOptions.map(([value, label]) => (
+                    <option value={value} key={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-[10px] font-semibold">
+                  우선순위
+                </label>
+                <select
+                  value={priority}
+                  onChange={(event) => setPriority(event.target.value)}
+                  className={input}
+                >
+                  {priorityOptions.map(([value, label]) => (
+                    <option value={value} key={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-[10px] font-semibold">
+                  프로젝트
+                </label>
+                <select
+                  value={projectId}
+                  onChange={(event) => setProjectId(event.target.value)}
+                  className={input}
+                >
+                  <option value="">프로젝트 연결 없음</option>
+                  {projects.map((project) => (
+                    <option value={project.id} key={project.id}>
+                      {project.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-[10px] font-semibold">
+                  담당 부서
+                </label>
+                <select
+                  value={departmentId}
+                  onChange={(event) => setDepartmentId(event.target.value)}
+                  className={input}
+                >
+                  <option value="">미배정</option>
+                  {departments.map((department) => (
+                    <option value={department.id} key={department.id}>
+                      {department.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-[10px] font-semibold">
+                  담당 직원
+                </label>
+                <select
+                  value={employeeId}
+                  onChange={(event) => setEmployeeId(event.target.value)}
+                  className={input}
+                >
+                  <option value="">미배정</option>
+                  {employees.map((employee) => (
+                    <option value={employee.id} key={employee.id}>
+                      {employee.name} · {employee.employee_code}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-[11px] bg-[#F7F8FA] px-3.5 py-2.5">
+                <input
+                  type="checkbox"
+                  checked={requiresApproval}
+                  onChange={(event) =>
+                    setRequiresApproval(event.target.checked)
+                  }
+                  className="h-4 w-4 accent-[#3157D5]"
+                />
+                <span>
+                  <span className="block text-[10px] font-semibold">
+                    완료 후 대표 승인 필요
+                  </span>
+                  <span className="mt-0.5 block text-[9px] text-[#9297A1]">
+                    중요한 최종 결과는 대표가 확인합니다.
+                  </span>
+                </span>
+              </label>
+            </div>
+
+            {message ? (
+              <div
+                className={`mt-4 rounded-[11px] px-4 py-3 text-[11px] ${
+                  success
+                    ? "bg-[#EEF8F2] text-[#2C7B50]"
+                    : "bg-[#FFF1F1] text-[#B14444]"
+                }`}
+              >
+                {message}
+              </div>
+            ) : null}
+
+            <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={resetAll}
+                disabled={submitting}
+                className="h-11 rounded-[11px] border border-[#E1E4E9] bg-white px-5 text-[11px] font-semibold text-[#666C76]"
+              >
+                처음부터 다시
+              </button>
+
+              <button
+                type="submit"
+                disabled={submitting}
+                className="h-11 rounded-[11px] bg-[#17181C] px-6 text-[11px] font-semibold text-white disabled:opacity-50"
+              >
+                {submitting ? "업무 등록 중..." : "이대로 업무 등록"}
+              </button>
+            </div>
+          </section>
+        </>
+      ) : message ? (
+        <div
+          className={`rounded-[11px] px-4 py-3 text-[11px] ${
+            success
+              ? "bg-[#EEF8F2] text-[#2C7B50]"
+              : "bg-[#FFF1F1] text-[#B14444]"
+          }`}
+        >
+          {message}
+        </div>
+      ) : null}
     </form>
   );
 }
