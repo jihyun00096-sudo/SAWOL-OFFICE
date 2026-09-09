@@ -4,6 +4,7 @@ import { FormEvent, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { createHumanCode } from "@/lib/sawol/code";
+import { rankEmployeesForTask, type AssignmentWorkload } from "@/lib/sawol/assignment";
 import {
   analyzeSecretaryCommand,
   type SecretaryAnalysis,
@@ -15,6 +16,7 @@ type Department = {
   code: string;
   name: string;
   department_type: string;
+  parent_department_id?: string | null;
 };
 
 type Project = {
@@ -26,6 +28,13 @@ type Employee = {
   id: string;
   name: string;
   employee_code: string;
+  department_id: string;
+  position: string;
+  specialty: unknown;
+  responsibilities: unknown;
+  work_style?: string | null;
+  status: string;
+  is_active?: boolean;
 };
 
 const taskTypeOptions = [
@@ -52,10 +61,12 @@ export function CommandForm({
   departments,
   projects,
   employees,
+  workloads,
 }: {
   departments: Department[];
   projects: Project[];
   employees: Employee[];
+  workloads: AssignmentWorkload[];
 }) {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement | null>(null);
@@ -120,13 +131,39 @@ export function CommandForm({
       departments,
     });
 
-    setAnalysis(nextAnalysis);
-    setTaskType(nextAnalysis.taskType);
-    setPriority(nextAnalysis.priority);
-    setProjectId(nextAnalysis.projectId);
-    setDepartmentId(nextAnalysis.departmentId);
-    setEmployeeId(nextAnalysis.employeeId);
-    setRequiresApproval(nextAnalysis.requiresCeoApproval);
+    const candidates = rankEmployeesForTask({
+      title: command.title,
+      description: command.description,
+      taskType: nextAnalysis.taskType,
+      departmentId: nextAnalysis.departmentId,
+      employees,
+      departments,
+      workloads,
+    });
+
+    const recommendedEmployeeId = candidates[0]?.employee.id ?? "";
+
+    const enrichedAnalysis = {
+      ...nextAnalysis,
+      employeeId: recommendedEmployeeId,
+      rationale: recommendedEmployeeId
+        ? [
+            ...nextAnalysis.rationale,
+            `${candidates[0].employee.name} 직원이 전문분야·소속 조직·현재 업무량 기준 1순위로 추천되었습니다.`,
+          ]
+        : [
+            ...nextAnalysis.rationale,
+            "현재 조건에서 확실한 추천 직원을 찾지 못해 미배정을 유지합니다.",
+          ],
+    };
+
+    setAnalysis(enrichedAnalysis);
+    setTaskType(enrichedAnalysis.taskType);
+    setPriority(enrichedAnalysis.priority);
+    setProjectId(enrichedAnalysis.projectId);
+    setDepartmentId(enrichedAnalysis.departmentId);
+    setEmployeeId(enrichedAnalysis.employeeId);
+    setRequiresApproval(enrichedAnalysis.requiresCeoApproval);
     setSuccess(true);
     setMessage(
       "비서실 분석이 완료되었습니다. 아래 제안값을 확인하거나 수정해주세요.",
@@ -177,7 +214,9 @@ export function CommandForm({
     const requestedResult =
       String(form.get("expected_result") ?? "").trim() || null;
 
-    const { error } = await supabase.from("tasks").insert({
+    const { data: createdTask, error } = await supabase
+      .from("tasks")
+      .insert({
       task_code: createHumanCode("TASK"),
       title,
       description,
@@ -185,7 +224,7 @@ export function CommandForm({
       priority,
       project_id: projectId || null,
       assigned_department_id: departmentId || null,
-      assigned_employee_id: employeeId || null,
+      assigned_employee_id: null,
       requires_ceo_approval: requiresApproval,
       status: "WAITING",
       review_level: 0,
@@ -217,7 +256,9 @@ export function CommandForm({
         requested_result: requestedResult,
         secretary_plan: analysis.steps,
       },
-    });
+    })
+      .select("id")
+      .single();
 
     if (error) {
       console.error(error);
@@ -227,6 +268,56 @@ export function CommandForm({
       );
       setSubmitting(false);
       return;
+    }
+
+    if (createdTask?.id && employeeId) {
+      const selectedEmployee = employees.find(
+        (employee) => employee.id === employeeId,
+      );
+
+      const candidates = rankEmployeesForTask({
+        title,
+        description,
+        taskType,
+        departmentId,
+        employees,
+        departments,
+        workloads,
+      });
+
+      const selectedCandidate = candidates.find(
+        (candidate) => candidate.employee.id === employeeId,
+      );
+
+      const { error: assignmentError } = await supabase.rpc(
+        "sawol_assign_task",
+        {
+          p_task_id: createdTask.id,
+          p_employee_id: employeeId,
+          p_assignment_source: "SECRETARY",
+          p_assignment_reason:
+            selectedCandidate?.reasons.join(" / ") ||
+            "대표가 업무지시 화면에서 담당 직원을 확정",
+          p_match_score: selectedCandidate?.score ?? null,
+          p_metadata: {
+            source: "COMMAND_FORM",
+            step: 21,
+            employee_code: selectedEmployee?.employee_code ?? null,
+            secretary_confidence: analysis.confidence,
+          },
+        },
+      );
+
+      if (assignmentError) {
+        console.error(assignmentError);
+        setSuccess(false);
+        setMessage(
+          "업무는 생성됐지만 직원 배정에 실패했습니다. 업무 상세에서 다시 배정해주세요.",
+        );
+        setSubmitting(false);
+        router.refresh();
+        return;
+      }
     }
 
     setSuccess(true);

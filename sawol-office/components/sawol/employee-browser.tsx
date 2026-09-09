@@ -12,6 +12,7 @@ type Employee = {
   position: string;
   status: string;
   specialty: unknown;
+  current_task_id?: string | null;
   departments: { id: string; name: string } | null;
 };
 
@@ -83,7 +84,16 @@ export function EmployeeBrowser({
                 <StatusBadge value={employee.status} label={labelOf(employeeStatusLabel, employee.status)} />
               </div>
 
-              <p className="mt-4 text-[11px] font-medium text-[#5F6570]">{employee.departments?.name ?? "소속 없음"}</p>
+              <div className="mt-4 flex items-center justify-between gap-3">
+                <p className="text-[11px] font-medium text-[#5F6570]">
+                  {employee.departments?.name ?? "소속 없음"}
+                </p>
+                {employee.current_task_id ? (
+                  <span className="shrink-0 rounded-full bg-[#EEF2FF] px-2 py-1 text-[8px] font-medium text-[#3157D5]">
+                    담당 업무 있음
+                  </span>
+                ) : null}
+              </div>
 
               <div className="mt-3 flex flex-wrap gap-1.5">
                 {specialties.map((item) => (

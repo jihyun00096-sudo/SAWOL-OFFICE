@@ -1,6 +1,9 @@
 import { CommandForm } from "@/components/sawol/command-form";
 import { OfficeShell } from "@/components/sawol/office-shell";
 import { PageHeader } from "@/components/sawol/page-header";
+import {
+  buildEmployeeWorkloads,
+} from "@/lib/sawol/assignment";
 import { requireSawolAdmin } from "@/lib/auth/require-sawol-admin";
 
 export const dynamic = "force-dynamic";
@@ -12,11 +15,12 @@ export default async function CommandPage() {
     { data: departments },
     { data: projects },
     { data: employees },
+    { data: activeTasks },
     { count: pendingApprovals },
   ] = await Promise.all([
     supabase
       .from("departments")
-      .select("id, code, name, department_type")
+      .select("id, code, name, department_type, parent_department_id")
       .eq("is_active", true)
       .order("sort_order"),
     supabase
@@ -26,21 +30,29 @@ export default async function CommandPage() {
       .order("created_at", { ascending: false }),
     supabase
       .from("employees")
-      .select("id, name, employee_code")
+      .select(
+        "id, name, employee_code, department_id, position, specialty, responsibilities, work_style, status, is_active",
+      )
       .eq("is_active", true)
       .order("employee_code"),
     supabase
-      .from("approvals")
+      .from("tasks")
+      .select("assigned_employee_id, status")
+      .not("assigned_employee_id", "is", null),
+    supabase
+      .from("tasks")
       .select("id", { count: "exact", head: true })
-      .eq("status", "PENDING"),
+      .eq("status", "PENDING_APPROVAL"),
   ]);
+
+  const workloads = buildEmployeeWorkloads((activeTasks ?? []) as any);
 
   return (
     <OfficeShell pendingApprovals={pendingApprovals ?? 0}>
       <PageHeader
         eyebrow="SECRETARY"
         title="업무지시"
-        description="대표의 지시를 먼저 비서실장이 분석하고, 배정안을 확인한 뒤 실제 업무로 등록합니다."
+        description="대표의 지시를 비서실장이 분석하고, STEP21 업무분배 엔진이 적합한 AI 직원을 함께 추천합니다."
       />
 
       <div className="mt-6">
@@ -48,6 +60,7 @@ export default async function CommandPage() {
           departments={(departments ?? []) as any}
           projects={(projects ?? []) as any}
           employees={(employees ?? []) as any}
+          workloads={workloads}
         />
       </div>
     </OfficeShell>

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { AssignmentAssistant } from "@/components/sawol/assignment-assistant";
 import { DetailSection } from "@/components/sawol/detail-section";
 import { OfficeShell } from "@/components/sawol/office-shell";
 import { PageHeader } from "@/components/sawol/page-header";
@@ -8,6 +9,10 @@ import { TaskDeleteButton } from "@/components/sawol/task-delete-button";
 import { TaskEditForm } from "@/components/sawol/task-edit-form";
 import { TaskRunPanel } from "@/components/sawol/task-run-panel";
 import { TaskStageActions } from "@/components/sawol/task-stage-actions";
+import {
+  buildEmployeeWorkloads,
+  rankEmployeesForTask,
+} from "@/lib/sawol/assignment";
 import {
   labelOf,
   priorityLabel,
@@ -44,6 +49,7 @@ export default async function TaskDetailPage({
     { data: projects },
     { data: departments },
     { data: employees },
+    { data: activeTasks },
     { data: runs },
     { count: pendingApprovals },
   ] = await Promise.all([
@@ -54,14 +60,20 @@ export default async function TaskDetailPage({
       .order("created_at", { ascending: false }),
     supabase
       .from("departments")
-      .select("id, name")
+      .select("id, code, name, parent_department_id")
       .eq("is_active", true)
       .order("sort_order"),
     supabase
       .from("employees")
-      .select("id, name, employee_code")
+      .select(
+        "id, name, employee_code, department_id, position, specialty, responsibilities, work_style, status, is_active",
+      )
       .eq("is_active", true)
       .order("employee_code"),
+    supabase
+      .from("tasks")
+      .select("assigned_employee_id, status")
+      .not("assigned_employee_id", "is", null),
     supabase
       .from("task_runs")
       .select(
@@ -76,6 +88,18 @@ export default async function TaskDetailPage({
   ]);
 
   if (!task) notFound();
+
+  const workloads = buildEmployeeWorkloads((activeTasks ?? []) as any);
+
+  const candidates = rankEmployeesForTask({
+    title: task.title,
+    description: task.description ?? "",
+    taskType: task.task_type,
+    departmentId: task.assigned_department_id,
+    employees: (employees ?? []) as any,
+    departments: (departments ?? []) as any,
+    workloads,
+  });
 
   return (
     <OfficeShell pendingApprovals={pendingApprovals ?? 0}>
@@ -142,6 +166,14 @@ export default async function TaskDetailPage({
           </p>
         </div>
       </section>
+
+      <div className="mt-5">
+        <AssignmentAssistant
+          taskId={task.id}
+          currentEmployeeId={task.assigned_employee_id}
+          candidates={candidates}
+        />
+      </div>
 
       <div className="mt-5">
         <TaskRunPanel

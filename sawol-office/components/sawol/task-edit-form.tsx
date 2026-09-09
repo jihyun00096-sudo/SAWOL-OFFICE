@@ -26,6 +26,7 @@ type Employee = {
   id: string;
   name: string;
   employee_code: string;
+  position?: string;
 };
 
 export function TaskEditForm({
@@ -51,8 +52,8 @@ export function TaskEditForm({
     const status = String(form.get("status") ?? task.status);
 
     if (
-      status === "CANCELLED" &&
-      task.status !== "CANCELLED" &&
+      ["CANCELLED", "CANCELED"].includes(status) &&
+      !["CANCELLED", "CANCELED"].includes(task.status) &&
       !window.confirm(
         "이 업무를 폐기 상태로 변경할까요?\n데이터는 삭제되지 않습니다.",
       )
@@ -66,6 +67,9 @@ export function TaskEditForm({
       setMessage("업무 제목은 필수입니다.");
       return;
     }
+
+    const nextEmployeeId =
+      String(form.get("assigned_employee_id") ?? "") || null;
 
     setBusy(true);
     setMessage("");
@@ -83,8 +87,6 @@ export function TaskEditForm({
         project_id: String(form.get("project_id") ?? "") || null,
         assigned_department_id:
           String(form.get("assigned_department_id") ?? "") || null,
-        assigned_employee_id:
-          String(form.get("assigned_employee_id") ?? "") || null,
         requires_ceo_approval:
           form.get("requires_ceo_approval") === "on",
         updated_at: new Date().toISOString(),
@@ -96,6 +98,52 @@ export function TaskEditForm({
       setMessage("업무 수정에 실패했습니다.");
       setBusy(false);
       return;
+    }
+
+    if (nextEmployeeId !== task.assigned_employee_id) {
+      if (nextEmployeeId) {
+        const { error: assignmentError } = await supabase.rpc(
+          "sawol_assign_task",
+          {
+            p_task_id: task.id,
+            p_employee_id: nextEmployeeId,
+            p_assignment_source: "MANUAL",
+            p_assignment_reason: "업무 관리 화면에서 대표가 직접 지정",
+            p_match_score: null,
+            p_metadata: {
+              source: "TASK_EDIT_FORM",
+              step: 21,
+            },
+          },
+        );
+
+        if (assignmentError) {
+          console.error(assignmentError);
+          setMessage(
+            "업무 내용은 저장됐지만 직원 배정에 실패했습니다. STEP21 SQL 적용 여부를 확인해주세요.",
+          );
+          setBusy(false);
+          router.refresh();
+          return;
+        }
+      } else {
+        const { error: unassignError } = await supabase.rpc(
+          "sawol_unassign_task",
+          {
+            p_task_id: task.id,
+          },
+        );
+
+        if (unassignError) {
+          console.error(unassignError);
+          setMessage(
+            "업무 내용은 저장됐지만 미배정 처리에 실패했습니다. STEP21 SQL 적용 여부를 확인해주세요.",
+          );
+          setBusy(false);
+          router.refresh();
+          return;
+        }
+      }
     }
 
     setMessage("저장되었습니다.");
@@ -152,9 +200,8 @@ export function TaskEditForm({
             <option value="WAITING_FOR_DATA">자료 대기</option>
             <option value="IN_PROGRESS">진행 중</option>
             <option value="COLLABORATING">협업 중</option>
-            <option value="IN_REVIEW">검수 중</option>
-            <option value="APPROVAL_WAIT">승인 대기</option>
-            <option value="REVISION_REQUESTED">수정 요청</option>
+            <option value="REVIEW">검수 대기</option>
+            <option value="PENDING_APPROVAL">대표 승인 대기</option>
             <option value="COMPLETED">완료</option>
             <option value="ON_HOLD">보류</option>
             <option value="CANCELLED">폐기</option>
@@ -217,6 +264,7 @@ export function TaskEditForm({
             {employees.map((employee) => (
               <option key={employee.id} value={employee.id}>
                 {employee.name} · {employee.employee_code}
+                {employee.position ? ` · ${employee.position}` : ""}
               </option>
             ))}
           </select>
