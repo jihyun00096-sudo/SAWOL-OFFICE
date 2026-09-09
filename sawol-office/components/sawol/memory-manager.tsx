@@ -2,6 +2,7 @@
 
 import { FormEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { MemoryDeleteButton } from "@/components/sawol/memory-delete-button";
 import { createClient } from "@/lib/supabase/client";
 import { createHumanCode } from "@/lib/sawol/code";
 import { memoryTypeLabel, labelOf } from "@/lib/sawol/labels";
@@ -156,34 +157,46 @@ export function MemoryManager({ memories }: { memories: Memory[] }) {
             key={memory.id}
             className="rounded-[17px] border border-[#E7E9EE] bg-white p-5"
           >
-            <div className="flex flex-wrap items-center gap-2 text-[9px]">
-              <span className="rounded-full bg-[#EEF2FF] px-2.5 py-1 font-medium text-[#3157D5]">
-                {labelOf(memoryTypeLabel, memory.memory_type)}
-              </span>
-
-              <span className="rounded-full bg-[#F4F5F7] px-2.5 py-1 text-[#737984]">
-                {labelOf(importanceLabel, memory.importance)}
-              </span>
-
-              <span className="rounded-full bg-[#F4F5F7] px-2.5 py-1 text-[#737984]">
-                {labelOf(confidenceLabel, memory.confidence)}
-              </span>
-
-              {memory.category ? (
-                <span className="text-[#999EA7]">
-                  {labelOf(categoryLabel, memory.category)}
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-2 text-[9px]">
+                <span className="rounded-full bg-[#EEF2FF] px-2.5 py-1 font-medium text-[#3157D5]">
+                  {labelOf(memoryTypeLabel, memory.memory_type)}
                 </span>
-              ) : null}
+
+                <span className="rounded-full bg-[#F4F5F7] px-2.5 py-1 text-[#737984]">
+                  {labelOf(importanceLabel, memory.importance)}
+                </span>
+
+                <span className="rounded-full bg-[#F4F5F7] px-2.5 py-1 text-[#737984]">
+                  {labelOf(confidenceLabel, memory.confidence)}
+                </span>
+
+                {memory.category ? (
+                  <span className="text-[#999EA7]">
+                    {labelOf(categoryLabel, memory.category)}
+                  </span>
+                ) : null}
+              </div>
+
+              <MemoryDeleteButton
+                memoryId={memory.id}
+                memoryTitle={memory.title}
+              />
             </div>
 
-            <h2 className="mt-4 text-[13px] font-semibold">{memory.title}</h2>
+            <h2 className="mt-4 text-[13px] font-semibold">
+              {memory.title}
+            </h2>
 
             <p className="mt-2 line-clamp-6 whitespace-pre-wrap text-[11px] leading-5 text-[#737984]">
               {memory.content}
             </p>
 
             <p className="mt-4 text-[9px] text-[#A1A6AF]">
-              {memory.memory_code} · {memory.source ? labelOf(sourceLabel, memory.source) : "출처 없음"}
+              {memory.memory_code} ·{" "}
+              {memory.source
+                ? labelOf(sourceLabel, memory.source)
+                : "출처 없음"}
             </p>
           </article>
         ))}

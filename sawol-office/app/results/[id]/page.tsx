@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { DetailSection } from "@/components/sawol/detail-section";
 import { OfficeShell } from "@/components/sawol/office-shell";
 import { PageHeader } from "@/components/sawol/page-header";
+import { ResultDeleteButton } from "@/components/sawol/result-delete-button";
 import { StatusBadge } from "@/components/sawol/status-badge";
 import {
   labelOf,
@@ -36,29 +37,30 @@ export default async function ResultDetailPage({
 
   if (!result) notFound();
 
-  const [{ data: employee }, { data: project }, { data: task }] = await Promise.all([
-    result.employee_id
-      ? supabase
-          .from("employees")
-          .select("id, name, employee_code")
-          .eq("id", result.employee_id)
-          .maybeSingle()
-      : Promise.resolve({ data: null }),
-    result.project_id
-      ? supabase
-          .from("projects")
-          .select("id, name, project_code")
-          .eq("id", result.project_id)
-          .maybeSingle()
-      : Promise.resolve({ data: null }),
-    result.task_id
-      ? supabase
-          .from("tasks")
-          .select("id, title, task_code")
-          .eq("id", result.task_id)
-          .maybeSingle()
-      : Promise.resolve({ data: null }),
-  ]);
+  const [{ data: employee }, { data: project }, { data: task }] =
+    await Promise.all([
+      result.employee_id
+        ? supabase
+            .from("employees")
+            .select("id, name, employee_code")
+            .eq("id", result.employee_id)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
+      result.project_id
+        ? supabase
+            .from("projects")
+            .select("id, name, project_code")
+            .eq("id", result.project_id)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
+      result.task_id
+        ? supabase
+            .from("tasks")
+            .select("id, title, task_code")
+            .eq("id", result.task_id)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
+    ]);
 
   const metadata = metadataObject(result.metadata);
 
@@ -76,6 +78,7 @@ export default async function ResultDetailPage({
             >
               결과 목록
             </Link>
+
             {task?.id ? (
               <Link
                 href={`/tasks/${task.id}`}
@@ -84,6 +87,11 @@ export default async function ResultDetailPage({
                 업무로 이동
               </Link>
             ) : null}
+
+            <ResultDeleteButton
+              resultId={result.id}
+              resultTitle={result.title}
+            />
           </div>
         }
       />
