@@ -20,9 +20,15 @@ export function CommandForm({ departments }: { departments: Department[] }) {
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
     if (submitting) return;
 
-    const form = new FormData(event.currentTarget);
+    // IMPORTANT:
+    // React's event.currentTarget should not be referenced after await.
+    // Keep a stable reference to the form before any async operation.
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+
     const title = String(form.get("title") ?? "").trim();
     const description = String(form.get("description") ?? "").trim();
 
@@ -66,7 +72,10 @@ export function CommandForm({ departments }: { departments: Department[] }) {
 
     setSuccess(true);
     setMessage("업무가 등록되었습니다. 전체 업무에서 확인할 수 있습니다.");
-    event.currentTarget.reset();
+
+    // Use the stable form reference captured before await.
+    formElement.reset();
+
     router.refresh();
     setSubmitting(false);
   }
@@ -79,7 +88,12 @@ export function CommandForm({ departments }: { departments: Department[] }) {
       <div className="grid gap-5">
         <div>
           <label className="mb-2 block text-[12px] font-semibold">업무 제목 *</label>
-          <input name="title" className={input} placeholder="예: 타로 기록 서비스 경쟁사이트 조사" maxLength={120} />
+          <input
+            name="title"
+            className={input}
+            placeholder="예: 타로 기록 서비스 경쟁사이트 조사"
+            maxLength={120}
+          />
         </div>
 
         <div>
@@ -130,24 +144,43 @@ export function CommandForm({ departments }: { departments: Department[] }) {
               </option>
             ))}
           </select>
-          <p className="mt-1.5 text-[10px] text-[#999EA7]">선택하지 않으면 향후 비서실 AI가 자동배정합니다.</p>
+          <p className="mt-1.5 text-[10px] text-[#999EA7]">
+            선택하지 않으면 향후 비서실 AI가 자동배정합니다.
+          </p>
         </div>
 
         <div>
           <label className="mb-2 block text-[12px] font-semibold">원하는 결과물</label>
-          <input name="expected_result" className={input} placeholder="예: 경쟁사 10곳 비교표 + 핵심 시사점" maxLength={300} />
+          <input
+            name="expected_result"
+            className={input}
+            placeholder="예: 경쟁사 10곳 비교표 + 핵심 시사점"
+            maxLength={300}
+          />
         </div>
 
         <label className="flex cursor-pointer items-start gap-3 rounded-[12px] bg-[#F7F8FA] p-3.5">
-          <input type="checkbox" name="requires_ceo_approval" className="mt-0.5 h-4 w-4 accent-[#3157D5]" />
+          <input
+            type="checkbox"
+            name="requires_ceo_approval"
+            className="mt-0.5 h-4 w-4 accent-[#3157D5]"
+          />
           <span>
             <span className="block text-[12px] font-medium">완료 후 대표 승인 필요</span>
-            <span className="mt-1 block text-[10px] leading-4 text-[#9297A1]">중요한 결과물이라면 승인 단계를 지정합니다.</span>
+            <span className="mt-1 block text-[10px] leading-4 text-[#9297A1]">
+              중요한 결과물이라면 승인 단계를 지정합니다.
+            </span>
           </span>
         </label>
 
         {message ? (
-          <div className={`rounded-[11px] px-4 py-3 text-[12px] ${success ? "bg-[#EEF8F2] text-[#2C7B50]" : "bg-[#FFF1F1] text-[#B14444]"}`}>
+          <div
+            className={`rounded-[11px] px-4 py-3 text-[12px] ${
+              success
+                ? "bg-[#EEF8F2] text-[#2C7B50]"
+                : "bg-[#FFF1F1] text-[#B14444]"
+            }`}
+          >
             {message}
           </div>
         ) : null}
@@ -156,7 +189,7 @@ export function CommandForm({ departments }: { departments: Department[] }) {
           <button
             type="submit"
             disabled={submitting}
-            className="h-11 rounded-[11px] bg-[#17181C] px-5 text-[12px] font-semibold text-white transition hover:bg-[#292B31] disabled:opacity-50"
+            className="h-11 w-full rounded-[11px] bg-[#17181C] px-5 text-[12px] font-semibold text-white transition hover:bg-[#292B31] disabled:opacity-50 sm:w-auto"
           >
             {submitting ? "등록 중..." : "업무 등록"}
           </button>
