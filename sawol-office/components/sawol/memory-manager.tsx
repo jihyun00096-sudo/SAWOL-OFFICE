@@ -41,7 +41,14 @@ const sourceLabel: Record<string, string> = {
   SYSTEM: "시스템",
   PROJECT: "프로젝트",
   TASK: "업무",
-  RESULT: "결과",
+  RESULT: "승인 결과",
+};
+
+const categoryLabel: Record<string, string> = {
+  APPROVED_RESULT: "승인 결과",
+  WORK_STYLE: "업무 방식",
+  DESIGN: "디자인",
+  COST: "비용",
 };
 
 export function MemoryManager({ memories }: { memories: Memory[] }) {
@@ -163,21 +170,20 @@ export function MemoryManager({ memories }: { memories: Memory[] }) {
               </span>
 
               {memory.category ? (
-                <span className="text-[#999EA7]">{memory.category}</span>
+                <span className="text-[#999EA7]">
+                  {labelOf(categoryLabel, memory.category)}
+                </span>
               ) : null}
             </div>
 
             <h2 className="mt-4 text-[13px] font-semibold">{memory.title}</h2>
 
-            <p className="mt-2 whitespace-pre-wrap text-[11px] leading-5 text-[#737984]">
+            <p className="mt-2 line-clamp-6 whitespace-pre-wrap text-[11px] leading-5 text-[#737984]">
               {memory.content}
             </p>
 
             <p className="mt-4 text-[9px] text-[#A1A6AF]">
-              {memory.memory_code} ·{" "}
-              {memory.source
-                ? labelOf(sourceLabel, memory.source)
-                : "출처 없음"}
+              {memory.memory_code} · {memory.source ? labelOf(sourceLabel, memory.source) : "출처 없음"}
             </p>
           </article>
         ))}

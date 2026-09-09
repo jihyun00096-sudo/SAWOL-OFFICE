@@ -3,7 +3,11 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { StatusBadge } from "@/components/sawol/status-badge";
-import { labelOf, resultTypeLabel } from "@/lib/sawol/labels";
+import {
+  labelOf,
+  resultStatusLabel,
+  resultTypeLabel,
+} from "@/lib/sawol/labels";
 
 type Result = {
   id: string;
@@ -75,7 +79,7 @@ export function ResultBrowser({ results }: { results: Result[] }) {
           <option value="">모든 상태</option>
           {statuses.map((value) => (
             <option key={value} value={value}>
-              {value}
+              {labelOf(resultStatusLabel, value)}
             </option>
           ))}
         </select>
@@ -104,7 +108,10 @@ export function ResultBrowser({ results }: { results: Result[] }) {
               <span className="rounded-full bg-[#F4F5F7] px-2.5 py-1 text-[10px] text-[#707680]">
                 {labelOf(resultTypeLabel, result.result_type)}
               </span>
-              <StatusBadge value={result.status} label={result.status} />
+              <StatusBadge
+                value={result.status}
+                label={labelOf(resultStatusLabel, result.status)}
+              />
             </div>
 
             <h2 className="mt-4 text-[14px] font-semibold">{result.title}</h2>
@@ -116,7 +123,7 @@ export function ResultBrowser({ results }: { results: Result[] }) {
             <div className="mt-4 flex flex-wrap gap-3 text-[10px] text-[#999EA7]">
               <span>{result.result_code}</span>
               <span>v{result.version}</span>
-              <span>{result.employees?.name ?? "담당자 없음"}</span>
+              <span>{result.employees?.name ?? "AI/미배정"}</span>
               {result.is_final ? (
                 <span className="font-medium text-[#3157D5]">최종본</span>
               ) : null}

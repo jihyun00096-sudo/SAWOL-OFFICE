@@ -15,11 +15,14 @@ export const taskStatusLabel: Record<string, string> = {
   IN_PROGRESS: "진행 중",
   COLLABORATING: "협업 중",
   IN_REVIEW: "검수 중",
+  REVIEW: "검수 대기",
   APPROVAL_WAIT: "승인 대기",
+  PENDING_APPROVAL: "대표 승인 대기",
   REVISION_REQUESTED: "수정 요청",
   COMPLETED: "완료",
   ON_HOLD: "보류",
   CANCELLED: "폐기",
+  CANCELED: "폐기",
   ERROR: "오류",
 };
 
@@ -53,6 +56,17 @@ export const resultTypeLabel: Record<string, string> = {
   OTHER: "기타",
 };
 
+export const resultStatusLabel: Record<string, string> = {
+  DRAFT: "초안",
+  IN_REVIEW: "검수 중",
+  REVIEW: "검수 중",
+  APPROVAL_WAIT: "승인 대기",
+  APPROVED: "승인 완료",
+  REJECTED: "반려",
+  SUPERSEDED: "이전 버전",
+  ARCHIVED: "보관",
+};
+
 export const memoryTypeLabel: Record<string, string> = {
   CEO: "대표 기억",
   PROJECT: "프로젝트",
@@ -61,7 +75,7 @@ export const memoryTypeLabel: Record<string, string> = {
   FAILURE: "실패",
   PROMPT: "프롬프트",
   RULE: "규칙",
-  RESULT: "결과",
+  RESULT: "결과 기억",
 };
 
 export function labelOf(

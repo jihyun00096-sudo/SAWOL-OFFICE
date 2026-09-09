@@ -17,9 +17,9 @@ export default async function ResultsPage() {
       )
       .order("created_at", { ascending: false }),
     supabase
-      .from("approvals")
+      .from("tasks")
       .select("id", { count: "exact", head: true })
-      .eq("status", "PENDING"),
+      .eq("status", "PENDING_APPROVAL"),
   ]);
 
   return (
@@ -27,14 +27,14 @@ export default async function ResultsPage() {
       <PageHeader
         eyebrow="RESULTS"
         title="결과함"
-        description="문서, 이미지, 코드, 리서치 등 직원들이 만든 결과물을 검색하고 상세 확인합니다."
+        description="대표 승인을 통과한 최종 결과물과 직원·AI가 만든 산출물을 검색하고 확인합니다."
       />
 
       {!results?.length ? (
         <div className="mt-7">
           <EmptyState
             title="아직 결과물이 없습니다."
-            description="AI 직원 실행 단계가 연결되면 완성된 결과가 이곳에 쌓입니다."
+            description="실행 결과가 대표 승인을 통과하면 최종 결과물이 이곳에 자동으로 쌓입니다."
           />
         </div>
       ) : (
