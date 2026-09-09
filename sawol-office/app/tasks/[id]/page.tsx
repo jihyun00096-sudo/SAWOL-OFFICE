@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/sawol/page-header";
 import { StatusBadge } from "@/components/sawol/status-badge";
 import { TaskDeleteButton } from "@/components/sawol/task-delete-button";
 import { TaskEditForm } from "@/components/sawol/task-edit-form";
+import { TaskStageActions } from "@/components/sawol/task-stage-actions";
 import {
   labelOf,
   priorityLabel,
@@ -14,6 +15,19 @@ import {
 import { requireSawolAdmin } from "@/lib/auth/require-sawol-admin";
 
 export const dynamic = "force-dynamic";
+
+const taskTypeLabel: Record<string, string> = {
+  RESEARCH: "리서치",
+  PLANNING: "기획",
+  PRODUCTION: "제작",
+  EDIT: "수정",
+  ANALYSIS: "분석",
+  OPERATION: "운영",
+  STUDY: "학습",
+  DEVELOPMENT: "개발",
+  DESIGN: "디자인",
+  OTHER: "기타",
+};
 
 export default async function TaskDetailPage({
   params,
@@ -62,6 +76,13 @@ export default async function TaskDetailPage({
         action={
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
             <Link
+              href="/queue"
+              className="flex h-10 items-center justify-center rounded-[10px] border border-[#DCE4FF] bg-[#F8FAFF] px-4 text-[11px] font-semibold text-[#3157D5]"
+            >
+              실행 큐
+            </Link>
+
+            <Link
               href="/tasks"
               className="flex h-10 items-center justify-center rounded-[10px] border border-[#E1E4E9] bg-white px-4 text-[11px] font-semibold text-[#656B75]"
             >
@@ -97,15 +118,23 @@ export default async function TaskDetailPage({
         <div className="rounded-[16px] border border-[#E7E9EE] bg-white p-4">
           <p className="text-[10px] text-[#9297A1]">업무 유형</p>
           <p className="mt-2 break-words text-[12px] font-medium">
-            {task.task_type}
+            {taskTypeLabel[task.task_type] ?? task.task_type}
           </p>
         </div>
       </section>
 
       <div className="mt-5">
+        <TaskStageActions
+          taskId={task.id}
+          currentStatus={task.status}
+          requiresCeoApproval={Boolean(task.requires_ceo_approval)}
+        />
+      </div>
+
+      <div className="mt-5">
         <DetailSection
           title="업무 관리"
-          description="업무 상태, 소속 프로젝트, 담당 부서와 직원을 직접 관리합니다."
+          description="업무 내용, 소속 프로젝트, 담당 부서와 직원을 직접 관리합니다."
         >
           <TaskEditForm
             task={task as any}
