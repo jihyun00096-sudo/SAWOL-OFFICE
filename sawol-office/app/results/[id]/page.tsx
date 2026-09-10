@@ -181,7 +181,7 @@ export default async function ResultDetailPage({
 
       <div className="mt-4">
         <DetailSection title="결과 내용">
-          <div className="whitespace-pre-wrap break-words text-[11px] leading-7 text-[#555B65]">
+          <div className="min-w-0 max-w-full whitespace-pre-wrap break-words [overflow-wrap:anywhere] overflow-hidden text-[11px] leading-7 text-[#555B65]">
             {result.content ?? "저장된 결과 내용이 없습니다."}
           </div>
         </DetailSection>
