@@ -6,6 +6,13 @@ import {
 } from "@/lib/sawol/assignment";
 
 export type WorkflowMode = "SINGLE" | "COLLAB";
+
+export type WorkflowAssessment = {
+  complexity: number;
+  mode: WorkflowMode;
+  threshold: number;
+  reasons: string[];
+};
 export type WorkflowPlanStep = {
   key: string; title: string; description: string; taskType: string; priority: string;
   dependsOn: string[]; employeeId: string; departmentId: string; matchScore: number | null;

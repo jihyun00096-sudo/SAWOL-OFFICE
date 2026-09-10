@@ -11,7 +11,8 @@ export type AutopilotStepResult = {
     | "FINISHING"
     | "WAITING"
     | "RUNNING"
-    | "NEEDS_DECISION";
+    | "NEEDS_DECISION"
+    | "COMPLETED";
   progress: number;
   title?: string;
   stepTitle?: string;
