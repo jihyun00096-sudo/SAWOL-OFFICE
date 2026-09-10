@@ -4,9 +4,10 @@ import { NextResponse, type NextRequest } from "next/server";
 export async function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
-  // External machine-to-machine endpoints authenticate themselves.
-  // Do not send Discord interactions or durable worker calls through
-  // the browser-login redirect middleware.
+  // Machine-to-machine endpoints must not be redirected to the browser login.
+  // Each endpoint performs its own authentication:
+  // - /api/discord/* : Discord signature or explicit admin/worker auth
+  // - /api/worker/*  : SAWOL_WORKER_SECRET
   if (
     pathname.startsWith("/api/discord/") ||
     pathname.startsWith("/api/worker/")
@@ -19,16 +20,6 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except:
-     * - _next/static
-     * - _next/image
-     * - favicon.ico
-     * - image assets
-     *
-     * API bypasses are handled explicitly above so the rest of the
-     * application's authentication behavior remains unchanged.
-     */
     "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };
