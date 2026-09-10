@@ -23,8 +23,8 @@ function safeMessage(error: unknown) {
 async function requireAdmin(supabase: any) {
   const { data: claimsData, error: claimsError } =
     await supabase.auth.getClaims();
-  const userId = claimsData?.claims?.sub as string | undefined;
 
+  const userId = claimsData?.claims?.sub as string | undefined;
   if (claimsError || !userId) return false;
 
   const { data: admin, error: adminError } = await supabase
@@ -75,7 +75,10 @@ export async function POST(
 
   if (!(await requireAdmin(supabase))) {
     return NextResponse.json(
-      { ok: false, message: "SAWOL OFFICE 대표 권한이 없습니다." },
+      {
+        ok: false,
+        message: "SAWOL OFFICE 대표 권한이 없습니다.",
+      },
       { status: 403 },
     );
   }
@@ -88,7 +91,10 @@ export async function POST(
 
   if (taskError || !task) {
     return NextResponse.json(
-      { ok: false, message: "업무를 찾을 수 없습니다." },
+      {
+        ok: false,
+        message: "업무를 찾을 수 없습니다.",
+      },
       { status: 404 },
     );
   }
@@ -97,7 +103,8 @@ export async function POST(
     return NextResponse.json(
       {
         ok: false,
-        message: "AI 자율 실행은 메인 업무에서만 시작할 수 있습니다.",
+        message:
+          "AI 자율 실행은 메인 업무에서만 시작할 수 있습니다.",
       },
       { status: 409 },
     );
@@ -105,7 +112,10 @@ export async function POST(
 
   if (task.execution_mode !== "AUTO") {
     return NextResponse.json(
-      { ok: false, message: "현재 수동 실행 모드입니다." },
+      {
+        ok: false,
+        message: "현재 수동 실행 모드입니다.",
+      },
       { status: 409 },
     );
   }
@@ -135,7 +145,10 @@ export async function POST(
     });
   }
 
-  if (existing?.status === "RUNNING" && !isStale(existing)) {
+  if (
+    existing?.status === "RUNNING" &&
+    !isStale(existing)
+  ) {
     return NextResponse.json({
       ok: true,
       state: "RUNNING",
@@ -158,7 +171,10 @@ export async function POST(
 
     if (insertError && insertError.code !== "23505") {
       return NextResponse.json(
-        { ok: false, message: insertError.message },
+        {
+          ok: false,
+          message: insertError.message,
+        },
         { status: 500 },
       );
     }
@@ -178,7 +194,10 @@ export async function POST(
 
     if (resetError) {
       return NextResponse.json(
-        { ok: false, message: resetError.message },
+        {
+          ok: false,
+          message: resetError.message,
+        },
         { status: 500 },
       );
     }
@@ -191,7 +210,8 @@ export async function POST(
       started_at: existing?.started_at || now,
       heartbeat_at: now,
       attempt_count: (existing?.attempt_count ?? 0) + 1,
-      last_message: "비서실장이 AI 직원 조직을 자동 실행 중입니다.",
+      last_message:
+        "비서실장이 AI 직원 조직을 자동 실행 중입니다.",
     })
     .eq("task_id", id)
     .eq("status", "QUEUED")
@@ -200,7 +220,10 @@ export async function POST(
 
   if (claimError) {
     return NextResponse.json(
-      { ok: false, message: claimError.message },
+      {
+        ok: false,
+        message: claimError.message,
+      },
       { status: 500 },
     );
   }
@@ -213,20 +236,37 @@ export async function POST(
     });
   }
 
-  // 중요:
-  // 기존 STEP22.5는 여기서 자신의 github.dev URL을 다시 fetch했습니다.
-  // Codespaces의 포트 프록시/인증 환경에서는 서버가 자기 외부 URL로
-  // 재접속할 때 Node fetch가 "fetch failed"로 끊길 수 있습니다.
-  // 이제 HTTP self-fetch 없이 기존 Supabase 세션으로 실행 함수를 직접 호출합니다.
   after(async () => {
     try {
       for (let index = 0; index < 24; index += 1) {
-        const payload = await runAutopilotStep(supabase, id);
+        const payload = await runAutopilotStep(
+          supabase,
+          id,
+        );
 
         const progress =
           typeof payload.progress === "number"
             ? payload.progress
             : 0;
+
+        if (payload.state === "NEEDS_DECISION") {
+          await updateJob(supabase, id, {
+            status: "PAUSED",
+            progress,
+            current_step_title:
+              payload.stepTitle ?? null,
+            last_error: null,
+            last_message:
+              payload.decisionMessage ||
+              "자동 재조사를 모두 시도했지만 대표 판단이 필요한 조건이 남았습니다.",
+            finished_at: new Date().toISOString(),
+            metadata: {
+              pause_reason: "RESEARCH_INSUFFICIENT",
+              automatic_research_retries_completed: true,
+            },
+          });
+          return;
+        }
 
         const message = payload.stepTitle
           ? `${payload.stepTitle} 완료 · 다음 단계로 인계 중입니다.`
@@ -237,7 +277,8 @@ export async function POST(
         await updateJob(supabase, id, {
           status: "RUNNING",
           progress,
-          current_step_title: payload.stepTitle ?? null,
+          current_step_title:
+            payload.stepTitle ?? null,
           last_message: message,
           last_error: null,
         });
@@ -265,7 +306,9 @@ export async function POST(
           return;
         }
 
-        await new Promise((resolve) => setTimeout(resolve, 650));
+        await new Promise((resolve) =>
+          setTimeout(resolve, 650),
+        );
       }
 
       throw new Error(
@@ -276,7 +319,7 @@ export async function POST(
         status: "FAILED",
         last_error: safeMessage(error),
         last_message:
-          "자동 실행이 중단되었습니다. 기존 작업 내용은 보존되었습니다.",
+          "기술 오류로 자동 실행이 중단되었습니다. 기존 작업 내용은 보존되었습니다.",
         finished_at: new Date().toISOString(),
       });
     }
@@ -287,7 +330,8 @@ export async function POST(
       ok: true,
       state: "RUNNING",
       background: true,
-      message: "AUTO 업무가 서버 내부 실행을 시작했습니다.",
+      message:
+        "AUTO 업무가 서버 내부 실행을 시작했습니다.",
     },
     { status: 202 },
   );
