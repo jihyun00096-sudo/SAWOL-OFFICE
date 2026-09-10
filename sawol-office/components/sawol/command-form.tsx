@@ -401,25 +401,22 @@ export function CommandForm({
           if (workflowError) throw new Error(workflowError.message);
         }
 
-        for (let i = 0; i < 12; i += 1) {
-          const response = await fetch(
-            `/api/office/tasks/${createdTask.id}/autopilot`,
-            { method: "POST" },
+        const startResponse = await fetch(
+          `/api/office/tasks/${createdTask.id}/autopilot/start`,
+          { method: "POST" },
+        );
+        const startPayload = await startResponse.json().catch(() => null);
+
+        if (!startResponse.ok || !startPayload?.ok) {
+          throw new Error(
+            startPayload?.message || `자동 실행 시작 실패 (${startResponse.status})`,
           );
-          const payload = await response.json().catch(() => null);
-
-          if (!response.ok || !payload?.ok) {
-            throw new Error(payload?.message || `자동 실행 실패 (${response.status})`);
-          }
-
-          if (typeof payload.progress === "number") {
-            setAutoProgress(payload.progress);
-          }
-
-          if (["AWAITING_APPROVAL", "COMPLETED"].includes(payload.state)) {
-            break;
-          }
         }
+
+        setAutoProgress(0);
+        setMessage(
+          "업무 등록 완료 · 이제부터 AI 직원들이 백그라운드에서 자동으로 처리합니다.",
+        );
 
         router.push(`/tasks/${createdTask.id}`);
         router.refresh();

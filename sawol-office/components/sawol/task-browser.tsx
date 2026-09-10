@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { StatusBadge } from "@/components/sawol/status-badge";
+import { TaskLiveProgress } from "@/components/sawol/task-live-progress";
 import {
   labelOf,
   priorityLabel,
@@ -47,15 +48,6 @@ const taskTypeLabel: Record<string, string> = {
   OTHER: "기타",
 };
 
-const compactStatusLabel: Record<string, string> = {
-  WAITING: "대기",
-  IN_PROGRESS: "작업 중",
-  REVIEW: "검수 중",
-  PENDING_APPROVAL: "승인 대기",
-  COMPLETED: "완료",
-  ON_HOLD: "보류",
-  ERROR: "오류",
-};
 
 export function TaskBrowser({ tasks }: { tasks: Task[] }) {
   const [query, setQuery] = useState("");
@@ -131,10 +123,6 @@ export function TaskBrowser({ tasks }: { tasks: Task[] }) {
       <div className="mt-3 space-y-3">
         {filtered.map((task) => {
           const workflow = task.workflow_summary;
-          const percent = workflow?.total
-            ? Math.round((workflow.completed / workflow.total) * 100)
-            : 0;
-
           return (
             <Link
               href={`/tasks/${task.id}`}
@@ -173,33 +161,13 @@ export function TaskBrowser({ tasks }: { tasks: Task[] }) {
                 </p>
               ) : null}
 
-              {workflow ? (
-                <div className="mt-4 rounded-[12px] bg-[#F7F9FF] px-3.5 py-3">
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                    <p className="min-w-0 text-[10px] leading-5 text-[#586173]">
-                      <span className="font-semibold text-[#3157D5]">
-                        현재 협업
-                      </span>
-                      {" · "}
-                      {workflow.current_title ?? "최종 정리"}
-                      {workflow.current_employee
-                        ? ` · ${workflow.current_employee}`
-                        : ""}
-                      {workflow.current_status
-                        ? ` · ${compactStatusLabel[workflow.current_status] ?? workflow.current_status}`
-                        : ""}
-                    </p>
-                    <span className="shrink-0 text-[9px] font-semibold text-[#777F8D]">
-                      {percent}%
-                    </span>
-                  </div>
-                  <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#E4E9F6]">
-                    <div
-                      className="h-full rounded-full bg-[#3157D5]"
-                      style={{ width: `${percent}%` }}
-                    />
-                  </div>
-                </div>
+              {workflow || task.execution_mode === "AUTO" ? (
+                <TaskLiveProgress
+                  taskId={task.id}
+                  taskStatus={task.status}
+                  executionMode={task.execution_mode}
+                  fallback={workflow}
+                />
               ) : null}
 
               <div className="mt-4 flex flex-wrap gap-x-5 gap-y-1 text-[10px] text-[#999EA7]">
