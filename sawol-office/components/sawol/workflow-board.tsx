@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { WorkflowAssessment } from "@/lib/sawol/workflow";
 
 const statusLabel: Record<string, string> = {
   WAITING: "대기",
@@ -14,14 +15,24 @@ export function WorkflowBoard({
   workflow,
   steps,
   dependencies,
+  assessment,
 }: {
-  workflow: { workflow_code: string; status: string; total_steps: number; completed_steps: number };
+  workflow: {
+    workflow_code: string;
+    status: string;
+    total_steps: number;
+    completed_steps: number;
+  };
   steps: Array<any>;
   dependencies: Array<any>;
+  assessment?: WorkflowAssessment | null;
 }) {
-  const completed = workflow.completed_steps ?? steps.filter((step) => step.status === "COMPLETED").length;
+  const completed =
+    workflow.completed_steps ??
+    steps.filter((step) => step.status === "COMPLETED").length;
   const total = workflow.total_steps || steps.length;
   const percent = total ? Math.round((completed / total) * 100) : 0;
+
   const depsByTask = new Map<string, any[]>();
   for (const dep of dependencies) {
     const list = depsByTask.get(dep.task_id) ?? [];
@@ -29,50 +40,137 @@ export function WorkflowBoard({
     depsByTask.set(dep.task_id, list);
   }
 
+  const current =
+    steps.find((step) =>
+      ["IN_PROGRESS", "REVIEW", "ERROR", "ON_HOLD"].includes(step.status),
+    ) ??
+    steps.find((step) => step.status === "WAITING") ??
+    null;
+
   return (
     <section className="rounded-[18px] border border-[#E7E9EE] bg-white p-4 sm:p-5 lg:p-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <p className="text-[13px] font-semibold">AI 협업 워크플로</p>
-            <span className="rounded-full bg-[#EEF2FF] px-2 py-1 text-[8px] font-semibold text-[#3157D5]">{workflow.workflow_code}</span>
+            <span className="rounded-full bg-[#EEF2FF] px-2 py-1 text-[8px] font-semibold text-[#3157D5]">
+              {workflow.workflow_code}
+            </span>
           </div>
-          <p className="mt-1 text-[10px] leading-5 text-[#8B919C]">각 단계는 선행 업무가 완료된 뒤 실행할 수 있으며 결과는 다음 직원에게 자동 인계됩니다.</p>
+          <p className="mt-1 text-[10px] leading-5 text-[#8B919C]">
+            대표에게는 메인 업무 하나만 보이고, 아래 내부 단계에서 AI 직원끼리 결과를 인수인계합니다.
+          </p>
         </div>
+
         <div className="text-left sm:text-right">
           <p className="text-[18px] font-semibold">{percent}%</p>
-          <p className="text-[9px] text-[#989EA8]">{completed} / {total} 완료</p>
+          <p className="text-[9px] text-[#989EA8]">
+            {completed} / {total} 완료
+          </p>
         </div>
       </div>
 
       <div className="mt-4 h-2 overflow-hidden rounded-full bg-[#EEF0F4]">
-        <div className="h-full rounded-full bg-[#3157D5] transition-all" style={{ width: `${percent}%` }} />
+        <div
+          className="h-full rounded-full bg-[#3157D5] transition-all"
+          style={{ width: `${percent}%` }}
+        />
       </div>
+
+      {current ? (
+        <div className="mt-4 rounded-[12px] border border-[#DDE4FA] bg-[#F8FAFF] px-4 py-3">
+          <p className="text-[9px] font-semibold text-[#3157D5]">현재 작업 중</p>
+          <p className="mt-1 text-[11px] font-semibold">{current.title}</p>
+          <p className="mt-1 text-[9px] text-[#818894]">
+            {current.employees?.name ?? "미배정"} ·{" "}
+            {statusLabel[current.status] ?? current.status}
+          </p>
+        </div>
+      ) : (
+        <div className="mt-4 rounded-[12px] bg-[#F7F8FA] px-4 py-3 text-[10px] text-[#737A85]">
+          모든 내부 단계가 완료되었습니다.
+        </div>
+      )}
+
+      {assessment ? (
+        <div className="mt-4 rounded-[12px] bg-[#FAFAFB] px-4 py-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-[10px] font-semibold">왜 협업으로 판단했나요?</p>
+            <span className="rounded-full bg-white px-2 py-1 text-[8px] text-[#6F7682]">
+              복잡도 {assessment.complexity} / 기준 {assessment.threshold}
+            </span>
+          </div>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {assessment.reasons.map((reason) => (
+              <span
+                key={reason}
+                className="rounded-full border border-[#E6E8ED] bg-white px-2.5 py-1 text-[8px] text-[#727985]"
+              >
+                {reason}
+              </span>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       <div className="mt-5 grid gap-3">
         {steps.map((step: any) => {
           const deps = depsByTask.get(step.id) ?? [];
-          const unmet = deps.filter((dep) => dep.depends_on?.status !== "COMPLETED");
+          const unmet = deps.filter(
+            (dep) => dep.depends_on?.status !== "COMPLETED",
+          );
+
           return (
-            <Link key={step.id} href={`/tasks/${step.id}`} className="block rounded-[15px] border border-[#E8EAF0] p-4 transition hover:border-[#D8DCE4]">
+            <Link
+              key={step.id}
+              href={`/tasks/${step.id}`}
+              className={`block rounded-[15px] border p-4 transition hover:border-[#D8DCE4] ${
+                current?.id === step.id
+                  ? "border-[#C9D5FF] bg-[#FBFCFF]"
+                  : "border-[#E8EAF0]"
+              }`}
+            >
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="rounded-full bg-[#F3F4F6] px-2 py-1 text-[9px] font-semibold">{String(step.workflow_step_no).padStart(2, "0")}</span>
-                    <span className="text-[9px] text-[#777D87]">{statusLabel[step.status] ?? step.status}</span>
+                    <span className="rounded-full bg-[#F3F4F6] px-2 py-1 text-[9px] font-semibold">
+                      {String(step.workflow_step_no).padStart(2, "0")}
+                    </span>
+                    <span className="text-[9px] text-[#777D87]">
+                      {statusLabel[step.status] ?? step.status}
+                    </span>
                     {unmet.length ? (
-                      <span className="rounded-full bg-[#FFF5DD] px-2 py-1 text-[8px] text-[#8A6824]">선행 업무 대기 {unmet.length}</span>
+                      <span className="rounded-full bg-[#FFF5DD] px-2 py-1 text-[8px] text-[#8A6824]">
+                        선행 업무 대기 {unmet.length}
+                      </span>
                     ) : step.status === "WAITING" ? (
-                      <span className="rounded-full bg-[#ECF8F0] px-2 py-1 text-[8px] text-[#2D7650]">진행 가능</span>
+                      <span className="rounded-full bg-[#ECF8F0] px-2 py-1 text-[8px] text-[#2D7650]">
+                        진행 가능
+                      </span>
                     ) : null}
                   </div>
-                  <p className="mt-2 break-words text-[12px] font-semibold">{step.title}</p>
-                  <p className="mt-1 text-[9px] text-[#969CA6]">{step.employees?.name ?? "미배정"} · {step.departments?.name ?? "미배정"}</p>
+
+                  <p className="mt-2 break-words text-[12px] font-semibold">
+                    {step.title}
+                  </p>
+                  <p className="mt-1 text-[9px] text-[#969CA6]">
+                    {step.employees?.name ?? "미배정"} ·{" "}
+                    {step.departments?.name ?? "미배정"}
+                  </p>
+
                   {deps.length ? (
-                    <p className="mt-2 break-words text-[9px] text-[#9A9FA8]">선행: {deps.map((dep) => dep.depends_on?.title ?? "업무").join(" · ")}</p>
+                    <p className="mt-2 break-words text-[9px] text-[#9A9FA8]">
+                      선행:{" "}
+                      {deps
+                        .map((dep) => dep.depends_on?.title ?? "업무")
+                        .join(" · ")}
+                    </p>
                   ) : null}
                 </div>
-                <span className="shrink-0 text-[9px] font-semibold text-[#3157D5]">단계 열기 →</span>
+
+                <span className="shrink-0 text-[9px] font-semibold text-[#3157D5]">
+                  단계 열기 →
+                </span>
               </div>
             </Link>
           );
