@@ -181,7 +181,7 @@ export default async function RunDetailPage({
             </p>
           ) : null}
 
-          <div className="mt-5 whitespace-pre-wrap text-[12px] leading-7 text-[#444A54]">
+          <div className="mt-5 min-w-0 max-w-full whitespace-pre-wrap break-words [overflow-wrap:anywhere] overflow-hidden text-[12px] leading-7 text-[#444A54]">
             {run.result_body}
           </div>
 
@@ -198,7 +198,7 @@ export default async function RunDetailPage({
                       {source.title || "출처"}
                     </p>
                     {source.note ? (
-                      <p className="mt-1 text-[9px] leading-5 text-[#858B96]">
+                      <p className="mt-1 break-words [overflow-wrap:anywhere] text-[9px] leading-5 text-[#858B96]">
                         {source.note}
                       </p>
                     ) : null}
