@@ -53,6 +53,7 @@ export async function POST(_req:Request,{params}:{params:Promise<{id:string}>}){
   if(!(await requireAdmin(supabase))) return NextResponse.json({ok:false,message:"권한이 없습니다."},{status:403});
   const {data:root}=await supabase.from("tasks").select("*").eq("id",id).maybeSingle();
   if(!root) return NextResponse.json({ok:false,message:"업무를 찾을 수 없습니다."},{status:404});
+  if(root.execution_mode !== "AUTO") return NextResponse.json({ok:false,message:"현재 수동 실행 모드입니다. 자동 실행으로 전환한 뒤 다시 시도해주세요."},{status:409});
   try{
     await supabase.from("tasks").update({requires_ceo_approval:true,updated_at:new Date().toISOString()}).eq("id",root.id);
     if(!root.workflow_id){

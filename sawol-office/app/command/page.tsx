@@ -52,7 +52,7 @@ export default async function CommandPage() {
       <PageHeader
         eyebrow="SECRETARY"
         title="업무지시"
-        description="대표의 지시를 비서실장이 분석하고, STEP21 업무분배 엔진이 적합한 AI 직원을 함께 추천합니다."
+        description="대표의 지시를 비서실장이 분석합니다. 자동 실행은 조직이 끝까지 처리하고, 수동 실행은 기존 배정·실행·검수 기능으로 직접 개입할 수 있습니다."
       />
 
       <div className="mt-6">

@@ -41,6 +41,7 @@ export default async function ApprovalsPage() {
       task_type,
       priority,
       status,
+      execution_mode,
       created_at,
       employees:assigned_employee_id(name),
       departments:assigned_department_id(name)
@@ -116,6 +117,7 @@ export default async function ApprovalsPage() {
                       <span className="text-[9px] text-[#999EA7]">
                         {taskTypeLabel[task.task_type] ?? task.task_type}
                       </span>
+                      <span className="rounded-full bg-[#F5F7FB] px-2.5 py-1 text-[9px] font-medium text-[#69717E]">{task.execution_mode === "AUTO" ? "자동 실행" : "수동 실행"}</span>
                     </div>
 
                     <h2 className="mt-3 break-words text-[14px] font-semibold">
@@ -166,7 +168,7 @@ export default async function ApprovalsPage() {
                   </div>
 
                   <div className="shrink-0">
-                    <ApprovalTaskActions taskId={task.id} />
+                    <ApprovalTaskActions taskId={task.id} executionMode={task.execution_mode === "AUTO" ? "AUTO" : "MANUAL"} />
                   </div>
                 </div>
               </article>

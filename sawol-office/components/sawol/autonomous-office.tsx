@@ -4,12 +4,13 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { buildWorkflowPlan } from "@/lib/sawol/workflow";
-import type { AssignmentDepartment, AssignmentEmployee, AssignmentWorkload } from "@/lib/sawol/assignment";
+import { rankEmployeesForTask, type AssignmentDepartment, type AssignmentEmployee, type AssignmentWorkload } from "@/lib/sawol/assignment";
 
-export function AutonomousOffice({task,employees,departments,workloads,hasWorkflow}:{task:{id:string;title:string;description:string|null;task_type:string;priority:string;status:string};employees:AssignmentEmployee[];departments:AssignmentDepartment[];workloads:AssignmentWorkload[];hasWorkflow:boolean}){
+export function AutonomousOffice({task,employees,departments,workloads,hasWorkflow,executionMode="AUTO"}:{task:{id:string;title:string;description:string|null;task_type:string;priority:string;status:string;assigned_employee_id?:string|null};employees:AssignmentEmployee[];departments:AssignmentDepartment[];workloads:AssignmentWorkload[];hasWorkflow:boolean;executionMode?:"AUTO"|"MANUAL"}){
   const router=useRouter(); const [busy,setBusy]=useState(false); const [message,setMessage]=useState(""); const [progress,setProgress]=useState<number|null>(null);
   const plan=useMemo(()=>buildWorkflowPlan({task,employees,departments,workloads}),[task,employees,departments,workloads]);
   async function advanceLoop(){
+    if(executionMode!=="AUTO") throw new Error("현재 수동 실행 모드입니다. 자동 실행으로 전환한 뒤 시작해주세요.");
     for(let i=0;i<12;i++){
       const r=await fetch(`/api/office/tasks/${task.id}/autopilot`,{method:"POST"}); const p=await r.json().catch(()=>null);
       if(!r.ok||!p?.ok) throw new Error(p?.message||`자동 실행 실패 (${r.status})`);
@@ -21,11 +22,18 @@ export function AutonomousOffice({task,employees,departments,workloads,hasWorkfl
     throw new Error("자동 실행 안전 한도에 도달했습니다. 진행 상태를 확인해주세요.");
   }
   async function start(){
-    if(busy)return; setBusy(true); setMessage(""); setProgress(0);
+    if(busy)return; if(executionMode!=="AUTO"){setMessage("현재 수동 실행 모드입니다. 위에서 자동 실행으로 전환해주세요.");return;} setBusy(true); setMessage(""); setProgress(0);
     try{
+      const supabase=createClient();
+      if(!hasWorkflow&&plan.mode==="SINGLE"&&!task.assigned_employee_id){
+        const ranked=rankEmployeesForTask({title:task.title,description:task.description??"",taskType:task.task_type,departmentId:null,employees,departments,workloads});
+        const top=ranked[0];
+        if(!top) throw new Error("자동 배정 가능한 직원을 찾지 못했습니다.");
+        const {error}=await supabase.rpc("sawol_assign_task",{p_task_id:task.id,p_employee_id:top.employee.id,p_assignment_source:"AUTOPILOT",p_assignment_reason:top.reasons.join(" / ")||"자동 실행 전 단일 업무 담당자 배정",p_match_score:top.score??null,p_metadata:{source:"STEP22_MODE_SWITCH",step:22}});
+        if(error) throw new Error(error.message);
+      }
       if(!hasWorkflow&&plan.mode==="COLLAB"){
         if(plan.steps.some(s=>!s.employeeId)) throw new Error("자동 배정 가능한 직원이 부족합니다.");
-        const supabase=createClient();
         const payload=plan.steps.map(s=>({key:s.key,title:s.title,description:s.description,task_type:s.taskType,priority:s.priority,employee_id:s.employeeId,department_id:s.departmentId||null,match_score:s.matchScore,assignment_reason:s.assignmentReason,depends_on:s.dependsOn}));
         const {error}=await supabase.rpc("sawol_create_workflow",{p_root_task_id:task.id,p_steps:payload}); if(error) throw new Error(error.message);
       }
@@ -33,6 +41,7 @@ export function AutonomousOffice({task,employees,departments,workloads,hasWorkfl
     }catch(e){setMessage(e instanceof Error?e.message:"자동 실행 중 오류가 발생했습니다.");}finally{setBusy(false);router.refresh();}
   }
   const closed=["COMPLETED","PENDING_APPROVAL","CANCELLED","CANCELED"].includes(task.status);
+  if(executionMode!=="AUTO") return null;
   return <section className="rounded-[18px] border border-[#DDE4FA] bg-[#FBFCFF] p-4 sm:p-5 lg:p-6">
     <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div><div className="flex flex-wrap items-center gap-2"><p className="text-[13px] font-semibold">AI 자율 오피스</p><span className="rounded-full bg-[#EEF2FF] px-2 py-1 text-[8px] font-semibold text-[#3157D5]">AUTO</span></div><p className="mt-1 max-w-[760px] text-[10px] leading-5 text-[#7A8290]">대표는 업무만 맡기면 됩니다. 비서실장 판단 → 직원 자동 배정 → 협업·인수인계 → 통합 검수까지 자동 진행하고 최종 결과만 승인함에 올립니다.</p></div>
       {!closed?<button onClick={start} disabled={busy} className="h-11 shrink-0 rounded-[11px] bg-[#3157D5] px-5 text-[11px] font-semibold text-white disabled:opacity-50">{busy?"AI 직원들이 처리 중...":"AI 조직에 맡기기"}</button>:null}</div>

@@ -10,6 +10,7 @@ import {
   type SecretaryAnalysis,
 } from "@/lib/sawol/secretary";
 import { SecretaryAnalysisCard } from "@/components/sawol/secretary-analysis-card";
+import { buildWorkflowPlan } from "@/lib/sawol/workflow";
 
 type Department = {
   id: string;
@@ -82,6 +83,8 @@ export function CommandForm({
   const [departmentId, setDepartmentId] = useState("");
   const [employeeId, setEmployeeId] = useState("");
   const [requiresApproval, setRequiresApproval] = useState(false);
+  const [executionMode, setExecutionMode] = useState<"AUTO" | "MANUAL">("AUTO");
+  const [autoProgress, setAutoProgress] = useState<number | null>(null);
 
   const projectName = useMemo(
     () => projects.find((project) => project.id === projectId)?.name,
@@ -163,7 +166,7 @@ export function CommandForm({
     setProjectId(enrichedAnalysis.projectId);
     setDepartmentId(enrichedAnalysis.departmentId);
     setEmployeeId(enrichedAnalysis.employeeId);
-    setRequiresApproval(enrichedAnalysis.requiresCeoApproval);
+    setRequiresApproval(executionMode === "AUTO" ? true : enrichedAnalysis.requiresCeoApproval);
     setSuccess(true);
     setMessage(
       "비서실 분석이 완료되었습니다. 아래 제안값을 확인하거나 수정해주세요.",
@@ -179,6 +182,8 @@ export function CommandForm({
     setDepartmentId("");
     setEmployeeId("");
     setRequiresApproval(false);
+    setExecutionMode("AUTO");
+    setAutoProgress(null);
     setMessage("");
     setSuccess(false);
   }
@@ -226,6 +231,7 @@ export function CommandForm({
       assigned_department_id: departmentId || null,
       assigned_employee_id: null,
       requires_ceo_approval: requiresApproval,
+      execution_mode: executionMode,
       status: "WAITING",
       review_level: 0,
       input_data: {
@@ -249,6 +255,7 @@ export function CommandForm({
             department_id: departmentId || null,
             employee_id: employeeId || null,
             requires_ceo_approval: requiresApproval,
+            execution_mode: executionMode,
           },
         },
       },
@@ -270,7 +277,17 @@ export function CommandForm({
       return;
     }
 
-    if (createdTask?.id && employeeId) {
+    const workflowPlan = buildWorkflowPlan({
+      task: { title, description, task_type: taskType, priority },
+      employees: employees as any,
+      departments: departments as any,
+      workloads,
+    });
+
+    const shouldAssignRootEmployee =
+      executionMode === "MANUAL" || workflowPlan.mode === "SINGLE";
+
+    if (createdTask?.id && employeeId && shouldAssignRootEmployee) {
       const selectedEmployee = employees.find(
         (employee) => employee.id === employeeId,
       );
@@ -320,8 +337,109 @@ export function CommandForm({
       }
     }
 
+    if (createdTask?.id && executionMode === "AUTO") {
+      try {
+        setSuccess(true);
+        setMessage("업무가 등록되었습니다. 비서실장이 자동 실행을 시작합니다.");
+        setAutoProgress(0);
+
+        if (workflowPlan.mode === "SINGLE" && !employeeId) {
+          const autoCandidates = rankEmployeesForTask({
+            title,
+            description,
+            taskType,
+            departmentId,
+            employees,
+            departments,
+            workloads,
+          });
+          const top = autoCandidates[0];
+          if (!top) throw new Error("자동 배정 가능한 직원을 찾지 못했습니다.");
+
+          const { error: autoAssignmentError } = await supabase.rpc(
+            "sawol_assign_task",
+            {
+              p_task_id: createdTask.id,
+              p_employee_id: top.employee.id,
+              p_assignment_source: "AUTOPILOT",
+              p_assignment_reason:
+                top.reasons.join(" / ") || "자동 실행 전 단일 업무 담당자 배정",
+              p_match_score: top.score ?? null,
+              p_metadata: {
+                source: "COMMAND_FORM_AUTO",
+                step: 22,
+                secretary_confidence: analysis.confidence,
+              },
+            },
+          );
+          if (autoAssignmentError) throw new Error(autoAssignmentError.message);
+        }
+
+        if (workflowPlan.mode === "COLLAB") {
+          if (workflowPlan.steps.some((step) => !step.employeeId)) {
+            throw new Error("자동 협업에 필요한 AI 직원을 충분히 배정하지 못했습니다.");
+          }
+
+          const workflowPayload = workflowPlan.steps.map((step) => ({
+            key: step.key,
+            title: step.title,
+            description: step.description,
+            task_type: step.taskType,
+            priority: step.priority,
+            employee_id: step.employeeId,
+            department_id: step.departmentId || null,
+            match_score: step.matchScore,
+            assignment_reason: step.assignmentReason,
+            depends_on: step.dependsOn,
+          }));
+
+          const { error: workflowError } = await supabase.rpc(
+            "sawol_create_workflow",
+            { p_root_task_id: createdTask.id, p_steps: workflowPayload },
+          );
+
+          if (workflowError) throw new Error(workflowError.message);
+        }
+
+        for (let i = 0; i < 12; i += 1) {
+          const response = await fetch(
+            `/api/office/tasks/${createdTask.id}/autopilot`,
+            { method: "POST" },
+          );
+          const payload = await response.json().catch(() => null);
+
+          if (!response.ok || !payload?.ok) {
+            throw new Error(payload?.message || `자동 실행 실패 (${response.status})`);
+          }
+
+          if (typeof payload.progress === "number") {
+            setAutoProgress(payload.progress);
+          }
+
+          if (["AWAITING_APPROVAL", "COMPLETED"].includes(payload.state)) {
+            break;
+          }
+        }
+
+        router.push(`/tasks/${createdTask.id}`);
+        router.refresh();
+        setSubmitting(false);
+        return;
+      } catch (autoError) {
+        console.error(autoError);
+        setSuccess(false);
+        setMessage(
+          `업무는 등록됐지만 자동 실행 중 멈췄습니다. 업무 상세에서 수동으로 개입하거나 자동 실행을 재개할 수 있습니다. ${autoError instanceof Error ? autoError.message : ""}`,
+        );
+        setSubmitting(false);
+        router.push(`/tasks/${createdTask.id}`);
+        router.refresh();
+        return;
+      }
+    }
+
     setSuccess(true);
-    setMessage("대표 확인이 완료되어 업무가 등록되었습니다.");
+    setMessage("수동 실행 업무가 등록되었습니다. 업무 상세에서 기존 수동 도구로 진행할 수 있습니다.");
 
     formElement.reset();
     setAnalysis(null);
@@ -331,6 +449,8 @@ export function CommandForm({
     setDepartmentId("");
     setEmployeeId("");
     setRequiresApproval(false);
+    setExecutionMode("AUTO");
+    setAutoProgress(null);
 
     router.refresh();
     setSubmitting(false);
@@ -430,6 +550,39 @@ export function CommandForm({
               </p>
             </div>
 
+            <div className="mt-5">
+              <p className="mb-2 text-[10px] font-semibold">실행 방식</p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => { setExecutionMode("AUTO"); setRequiresApproval(true); }}
+                  className={`rounded-[14px] border p-4 text-left transition ${executionMode === "AUTO" ? "border-[#BFCBFF] bg-[#F6F8FF]" : "border-[#E3E6EB] bg-white"}`}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-[12px] font-semibold">자동 실행</span>
+                    <span className={`rounded-full px-2 py-1 text-[9px] font-semibold ${executionMode === "AUTO" ? "bg-[#3157D5] text-white" : "bg-[#F2F3F5] text-[#8A909A]"}`}>추천</span>
+                  </div>
+                  <p className="mt-2 break-keep text-[10px] leading-5 text-[#7D8490]">
+                    비서실장이 직원 배정, 협업, 실행, 내부 검수까지 이어서 처리하고 대표에게 최종 결과를 올립니다.
+                  </p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setExecutionMode("MANUAL")}
+                  className={`rounded-[14px] border p-4 text-left transition ${executionMode === "MANUAL" ? "border-[#C9CDD5] bg-[#F8F9FA]" : "border-[#E3E6EB] bg-white"}`}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-[12px] font-semibold">수동 실행</span>
+                    <span className={`rounded-full px-2 py-1 text-[9px] font-semibold ${executionMode === "MANUAL" ? "bg-[#17181C] text-white" : "bg-[#F2F3F5] text-[#8A909A]"}`}>직접 개입</span>
+                  </div>
+                  <p className="mt-2 break-keep text-[10px] leading-5 text-[#7D8490]">
+                    지금까지 만든 배정·실행·상태변경·업무수정 기능을 그대로 사용하며 대표가 과정에 직접 참여합니다.
+                  </p>
+                </button>
+              </div>
+            </div>
+
             <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <div>
                 <label className="mb-2 block text-[10px] font-semibold">
@@ -503,7 +656,7 @@ export function CommandForm({
 
               <div>
                 <label className="mb-2 block text-[10px] font-semibold">
-                  담당 직원
+                  담당 직원 {executionMode === "AUTO" ? "(단일 업무 우선 담당)" : ""}
                 </label>
                 <select
                   value={employeeId}
@@ -523,17 +676,16 @@ export function CommandForm({
                 <input
                   type="checkbox"
                   checked={requiresApproval}
-                  onChange={(event) =>
-                    setRequiresApproval(event.target.checked)
-                  }
-                  className="h-4 w-4 accent-[#3157D5]"
+                  disabled={executionMode === "AUTO"}
+                  onChange={(event) => setRequiresApproval(event.target.checked)}
+                  className="h-4 w-4 accent-[#3157D5] disabled:opacity-60"
                 />
                 <span>
                   <span className="block text-[10px] font-semibold">
                     완료 후 대표 승인 필요
                   </span>
                   <span className="mt-0.5 block text-[9px] text-[#9297A1]">
-                    중요한 최종 결과는 대표가 확인합니다.
+                    {executionMode === "AUTO" ? "자동 실행은 최종 결과를 반드시 대표 승인함에 올립니다." : "중요한 최종 결과는 대표가 확인합니다."}
                   </span>
                 </span>
               </label>
@@ -566,7 +718,7 @@ export function CommandForm({
                 disabled={submitting}
                 className="h-11 rounded-[11px] bg-[#17181C] px-6 text-[11px] font-semibold text-white disabled:opacity-50"
               >
-                {submitting ? "업무 등록 중..." : "이대로 업무 등록"}
+                {submitting ? (executionMode === "AUTO" ? `자동 실행 중${autoProgress !== null ? ` ${autoProgress}%` : "..."}` : "업무 등록 중...") : executionMode === "AUTO" ? "등록하고 자동 실행" : "수동 업무 등록"}
               </button>
             </div>
           </section>
