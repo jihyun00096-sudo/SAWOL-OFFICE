@@ -1,4 +1,9 @@
-import nacl from "tweetnacl";
+import { createPublicKey, verify } from "node:crypto";
+
+const ED25519_SPKI_PREFIX = Buffer.from(
+  "302a300506032b6570032100",
+  "hex",
+);
 
 export function verifyDiscordRequest({
   rawBody,
@@ -14,10 +19,26 @@ export function verifyDiscordRequest({
   if (!signature || !timestamp || !publicKey) return false;
 
   try {
-    return nacl.sign.detached.verify(
+    const rawPublicKey = Buffer.from(publicKey, "hex");
+
+    if (rawPublicKey.length !== 32) {
+      return false;
+    }
+
+    const key = createPublicKey({
+      key: Buffer.concat([
+        ED25519_SPKI_PREFIX,
+        rawPublicKey,
+      ]),
+      format: "der",
+      type: "spki",
+    });
+
+    return verify(
+      null,
       Buffer.from(timestamp + rawBody),
+      key,
       Buffer.from(signature, "hex"),
-      Buffer.from(publicKey, "hex"),
     );
   } catch {
     return false;
