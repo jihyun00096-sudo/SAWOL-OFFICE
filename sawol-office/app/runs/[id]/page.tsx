@@ -11,6 +11,7 @@ import {
   isAiProviderConfigured,
 } from "@/lib/ai/provider";
 import { requireSawolAdmin } from "@/lib/auth/require-sawol-admin";
+import { getConfiguredGeminiModel } from "@/lib/ai/gemini-config";
 
 export const dynamic = "force-dynamic";
 
@@ -58,27 +59,14 @@ export default async function RunDetailPage({
   const providerLabel = getAiProviderDisplayName(provider);
   const configured = isAiProviderConfigured(provider);
 
-  const geminiSearchEnabled = !["0", "false", "off", "no"].includes(
-    (process.env.GEMINI_ENABLE_SEARCH || "true").toLowerCase(),
-  );
-
   const configuredModel =
     provider === "mock"
       ? "sawol-mock-v1"
       : provider === "gemini"
-        ? task?.task_type === "RESEARCH" && geminiSearchEnabled
-          ? process.env.GEMINI_RESEARCH_MODEL || "gemini-2.5-flash-lite"
-          : process.env.GEMINI_MODEL || "gemini-3.5-flash-lite"
+        ? getConfiguredGeminiModel()
         : process.env.OPENAI_MODEL || "gpt-5.6-luna";
 
-  const openAiWebSearchEnabled = !["0", "false", "off", "no"].includes(
-    (process.env.OPENAI_ENABLE_WEB_SEARCH || "true").toLowerCase(),
-  );
-
-  const researchMode =
-    task?.task_type === "RESEARCH" &&
-    provider === "openai" &&
-    openAiWebSearchEnabled;
+  const researchMode = task?.task_type === "RESEARCH";
 
   return (
     <OfficeShell pendingApprovals={pendingApprovals ?? 0}>

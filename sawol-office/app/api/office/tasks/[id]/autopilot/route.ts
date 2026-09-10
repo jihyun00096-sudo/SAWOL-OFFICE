@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { executeAiTask } from "@/lib/ai/provider";
 import { createHumanCode } from "@/lib/sawol/code";
 import type { SawolAiContext } from "@/lib/ai/types";
+import { shouldUseWebResearch } from "@/lib/ai/research-policy";
 
 export const runtime = "nodejs";
 export const maxDuration = 180;
@@ -35,7 +36,7 @@ async function executeTask(supabase:any, task:any){
   ]);
   const context:SawolAiContext={task,project:projectResult.data??null,department:departmentResult.data??null,employee:employeeResult.data??null,memories:memoryResult.data??[],handoffs:handoffResult.data??[],rootTask:rootTaskResult.data??null,feedbacks:feedbackResult.data??[]};
   try {
-    const ai=await executeAiTask({context,useWebSearch:task.task_type==="RESEARCH"});
+    const ai=await executeAiTask({context,useWebSearch:shouldUseWebResearch(context)});
     const now=new Date().toISOString();
     const {error:saveErr}=await supabase.from("task_runs").update({status:"COMPLETED",provider:ai.provider,model:ai.model,provider_response_id:ai.responseId,usage_json:ai.usage,ai_finished_at:now,submitted_at:now,completed_at:now,result_title:ai.result.title,result_summary:ai.result.summary,result_body:ai.result.body,error_message:null,metadata:{...(run.metadata??{}),autopilot:true,confidence:ai.result.confidence,sources:ai.result.sources},updated_at:now}).eq("id",run.id);
     if(saveErr) throw new Error(saveErr.message);

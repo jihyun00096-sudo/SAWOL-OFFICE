@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { executeAiTask } from "@/lib/ai/provider";
 import type { SawolAiContext } from "@/lib/ai/types";
+import { shouldUseWebResearch } from "@/lib/ai/research-policy";
 
 export const runtime = "nodejs";
 export const maxDuration = 180;
@@ -87,6 +88,7 @@ export async function POST(
     memoryResult,
     handoffResult,
     rootTaskResult,
+    feedbackResult,
   ] = await Promise.all([
     task.project_id
       ? supabase.from("projects").select("*").eq("id", task.project_id).maybeSingle()
@@ -104,6 +106,7 @@ export async function POST(
     task.parent_task_id
       ? supabase.from("tasks").select("task_code, title, description, task_type, priority").eq("id", task.parent_task_id).maybeSingle()
       : Promise.resolve({ data: null, error: null }),
+    supabase.from("task_feedback").select("reason, created_at").eq("root_task_id", task.parent_task_id || task.id).eq("status", "ACTIVE").order("created_at", { ascending: false }).limit(3),
   ]);
 
   const context: SawolAiContext = {
@@ -114,6 +117,7 @@ export async function POST(
     memories: (memoryResult.data as Record<string, unknown>[] | null) ?? [],
     handoffs: (handoffResult.data as Record<string, unknown>[] | null) ?? [],
     rootTask: (rootTaskResult.data as Record<string, unknown> | null) ?? null,
+    feedbacks: (feedbackResult.data as Record<string, unknown>[] | null) ?? [],
   };
 
   const now = new Date().toISOString();
@@ -139,7 +143,7 @@ export async function POST(
   try {
     const ai = await executeAiTask({
       context,
-      useWebSearch: task.task_type === "RESEARCH",
+      useWebSearch: shouldUseWebResearch(context),
     });
 
     const finishedAt = new Date().toISOString();

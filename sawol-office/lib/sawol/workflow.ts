@@ -33,25 +33,25 @@ export function assessWorkflowComplexity(task:{title:string;description:string|n
 function templateFor(taskType:string,title:string,description:string|null) {
   const text = `${title} ${description ?? ""}`.toLowerCase();
   if (taskType === "DEVELOPMENT") return [
-    {key:"spec",title:"요구사항·데이터 구조 정리",description:"대표 요청을 구현 가능한 요구사항, 데이터 구조, 권한·보안 조건과 완료 기준으로 정리합니다.",taskType:"PLANNING",dependsOn:[]},
-    {key:"build",title:"핵심 기능 구현안 작성",description:"확정된 요구사항을 바탕으로 실제 구현 구조와 핵심 로직을 작성합니다.",taskType:"DEVELOPMENT",dependsOn:["spec"]},
-    {key:"ui",title:"사용 화면·운영 흐름 정리",description:"사용자가 실제로 쓰는 화면과 운영 흐름, 모바일 대응을 구체화합니다.",taskType:"DEVELOPMENT",dependsOn:["spec"]},
-    {key:"final",title:"통합 검수·최종 결과 정리",description:"앞 단계 결과를 모두 통합해 누락·오류·보안 위험을 검수하고 대표 승인용 최종본 하나로 정리합니다.",taskType:"ANALYSIS",dependsOn:["spec","build","ui"]},
+    {key:"spec",title:"요구사항·데이터 구조 정리",description:"대표 원문의 요구사항을 생략하지 말고 구현 가능한 요구사항, 데이터 구조, 권한·보안 조건, 예외 케이스와 완료 기준까지 실무 문서 수준으로 정리합니다.",taskType:"PLANNING",dependsOn:[]},
+    {key:"build",title:"핵심 기능 구현안 작성",description:"확정된 요구사항을 바탕으로 실제 구현 구조, 핵심 로직, 오류 처리와 테스트 포인트까지 다음 직원이 바로 이어받을 수 있는 수준으로 작성합니다.",taskType:"DEVELOPMENT",dependsOn:["spec"]},
+    {key:"ui",title:"사용 화면·운영 흐름 정리",description:"사용자가 실제로 쓰는 화면과 운영 흐름, 모바일 대응, 상태별 UI와 예외 상황까지 구체화합니다.",taskType:"DEVELOPMENT",dependsOn:["spec"]},
+    {key:"final",title:"통합 검수·최종 결과 정리",description:"앞 단계 결과를 모두 읽고 대표 원문의 요구사항 체크리스트와 대조합니다. 누락·오류·보안 위험을 수정한 뒤 요약본이 아니라 대표가 바로 사용할 수 있는 완성형 최종본 하나로 통합합니다.",taskType:"ANALYSIS",dependsOn:["spec","build","ui"]},
   ];
   if (taskType === "DESIGN" || text.includes("상세페이지")) return [
-    {key:"research",title:"필요 자료·타깃 확인",description:"대표 요청을 수행하는 데 꼭 필요한 타깃, 기존 자료와 참고 기준만 확인합니다.",taskType:"RESEARCH",dependsOn:[]},
-    {key:"structure",title:"전체 구성·카피 기획",description:"조사 결과를 바탕으로 전체 정보 구조, 핵심 메시지와 섹션별 내용을 설계합니다.",taskType:"PLANNING",dependsOn:["research"]},
-    {key:"design",title:"실제 제작안 구체화",description:"기획 결과를 실제 제작에 바로 사용할 수 있는 수준으로 구체화합니다.",taskType:"DESIGN",dependsOn:["structure"]},
-    {key:"final",title:"통합 검수·최종본 정리",description:"모든 결과를 통합해 누락·과장·흐름을 검수하고 대표 승인용 최종 결과 하나로 정리합니다.",taskType:"ANALYSIS",dependsOn:["research","structure","design"]},
+    {key:"research",title:"필요 자료·타깃 확인",description:"대표 요청을 수행하는 데 필요한 타깃, 기존 자료, 사실 근거, 참고 기준을 확인하고 불확실한 부분을 분리합니다. 조사 결과는 다음 단계가 실제 기획에 쓸 수 있을 정도로 구체적으로 남깁니다.",taskType:"RESEARCH",dependsOn:[]},
+    {key:"structure",title:"전체 구성·카피 기획",description:"조사 결과와 대표 원문을 바탕으로 전체 정보 구조, 핵심 메시지, 섹션별 목적과 실제 들어갈 내용을 구체적으로 설계합니다. 제목만 나열하지 않습니다.",taskType:"PLANNING",dependsOn:["research"]},
+    {key:"design",title:"실제 제작안 구체화",description:"기획 결과를 실제 제작에 바로 사용할 수 있도록 문구, 구성, 우선순위, 화면 흐름과 제작 지시까지 구체화합니다.",taskType:"DESIGN",dependsOn:["structure"]},
+    {key:"final",title:"통합 검수·최종본 정리",description:"모든 단계 결과를 대표 원문의 요구사항과 다시 대조하고 누락·과장·중복을 수정합니다. 선행 결과를 짧게 요약하지 말고 대표가 바로 사용할 수 있는 완성형 최종 결과 하나로 통합합니다.",taskType:"ANALYSIS",dependsOn:["research","structure","design"]},
   ];
   if (taskType === "RESEARCH" || taskType === "ANALYSIS") return [
-    {key:"research",title:"자료 조사·사실 확인",description:"필요 자료와 근거를 수집하고 확인된 사실과 추정을 분리합니다.",taskType:"RESEARCH",dependsOn:[]},
-    {key:"analysis",title:"비교·분석",description:"수집 자료를 목적에 맞게 비교하고 핵심 시사점을 구조화합니다.",taskType:"ANALYSIS",dependsOn:["research"]},
-    {key:"final",title:"최종 보고서 정리",description:"조사와 분석을 통합해 대표가 바로 판단할 수 있는 최종 결과로 정리합니다.",taskType:"ANALYSIS",dependsOn:["research","analysis"]},
+    {key:"research",title:"자료 조사·사실 확인",description:"필요 자료를 새로 조사하고 각 근거의 출처·날짜·확인 범위를 기록합니다. 기사 제목만으로 내용을 추정하지 말고 확인된 사실과 추정을 엄격히 분리합니다.",taskType:"RESEARCH",dependsOn:[]},
+    {key:"analysis",title:"비교·분석",description:"수집 자료의 출처와 사실관계를 유지한 채 비교하고 대표의 목적에 맞는 핵심 시사점, 차이점, 리스크를 구체적으로 구조화합니다.",taskType:"ANALYSIS",dependsOn:["research"]},
+    {key:"final",title:"최종 보고서 정리",description:"조사와 분석의 근거를 유지하면서 대표 원문의 수량·형식·출처 조건을 다시 확인하고, 대표가 바로 판단하거나 사용할 수 있는 완성형 최종 결과로 정리합니다.",taskType:"ANALYSIS",dependsOn:["research","analysis"]},
   ];
   return [
-    {key:"produce",title:title,description:description ?? "대표 요청을 그대로 수행해 완성 결과를 만듭니다.",taskType:taskType || "PRODUCTION",dependsOn:[]},
-    {key:"final",title:"최종 검수·결과 정리",description:"앞 결과를 검수하고 대표 승인용 최종본 하나로 정리합니다.",taskType:"ANALYSIS",dependsOn:["produce"]},
+    {key:"produce",title:title,description:description ?? "대표 요청의 세부 조건을 생략하지 않고 그대로 수행해 바로 사용할 수 있는 완성 결과를 만듭니다.",taskType:taskType || "PRODUCTION",dependsOn:[]},
+    {key:"final",title:"최종 검수·결과 정리",description:"앞 결과를 대표 원문과 항목별로 대조해 누락을 보완하고, 단순 요약이 아닌 대표 승인용 완성 최종본 하나로 정리합니다.",taskType:"ANALYSIS",dependsOn:["produce"]},
   ];
 }
 

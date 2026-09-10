@@ -120,7 +120,7 @@ export function AiExecuteButton({
 
             {!isMock && researchMode ? (
               <span className="rounded-full bg-[#FFF5DD] px-2 py-1 text-[8px] text-[#8A6824]">
-                외부 웹 검색 없음
+                검증 검색 사용
               </span>
             ) : null}
           </div>
@@ -129,7 +129,7 @@ export function AiExecuteButton({
             {isMock
               ? "실제 API 비용 없이 업무 실행 → 결과 저장 → 검수 흐름을 테스트합니다. 외부 사실이나 최신 정보는 실제로 조회하지 않습니다."
               : isGemini
-                ? "Gemini가 회사 기억, 프로젝트, 담당 직원, 업무 지시와 STEP22 인수인계를 읽고 실제 결과물을 생성합니다. 무료 테스트에서는 외부 Google 검색을 사용하지 않습니다."
+                ? "Gemini가 회사 기억, 프로젝트, 담당 직원, 대표 원문과 STEP22 인수인계를 읽고 결과물을 생성합니다. 최신 정보 업무는 별도 검증 검색을 거치며 속도보다 정확성과 요청 조건 준수를 우선합니다."
                 : "회사 기억, 프로젝트, 담당 부서·직원, 현재 업무 지시를 조합해 실제 AI 결과물을 생성합니다. 결과는 검수 대기로 이동합니다."}
           </p>
         </div>
