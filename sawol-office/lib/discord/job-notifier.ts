@@ -77,7 +77,7 @@ async function markNotified(
 async function loadTask(supabase: any, taskId: string) {
   const { data, error } = await supabase
     .from("tasks")
-    .select("id,task_code,title,status,execution_mode")
+    .select("id,task_code,title,status,execution_mode,assigned_employee_id,workflow_id")
     .eq("id", taskId)
     .maybeSingle();
 
@@ -85,6 +85,134 @@ async function loadTask(supabase: any, taskId: string) {
   return data;
 }
 
+
+
+async function loadEmployeeName(supabase: any, employeeId?: string | null) {
+  if (!employeeId) return null;
+
+  const { data } = await supabase
+    .from("employees")
+    .select("name,position")
+    .eq("id", employeeId)
+    .maybeSingle();
+
+  if (!data) return null;
+  return [data.name, data.position].filter(Boolean).join(" · ");
+}
+
+async function loadWorkflowSummary(supabase: any, rootTaskId: string) {
+  const { data } = await supabase
+    .from("tasks")
+    .select("id,title,status,workflow_step_no,assigned_employee_id")
+    .eq("parent_task_id", rootTaskId)
+    .order("workflow_step_no", { ascending: true });
+
+  return data ?? [];
+}
+
+async function maybeSendAssignmentNotice(
+  supabase: any,
+  job: any,
+  task: any,
+  detailUrl: string,
+) {
+  const metadata = safeMetadata(job.metadata);
+  const previousEmployee =
+    metadata.discord_assignment_employee_id ?? null;
+
+  if (!task.assigned_employee_id) return;
+  if (previousEmployee === task.assigned_employee_id) return;
+
+  const employeeName = await loadEmployeeName(
+    supabase,
+    task.assigned_employee_id,
+  );
+
+  await sendDiscordChannelMessage(
+    "직원-배정현황",
+    [
+      "👤 **직원 배정 완료**",
+      "",
+      `**${task.title || task.task_code}**`,
+      `담당: ${employeeName || task.assigned_employee_id}`,
+      `업무 코드: ${task.task_code ?? "-"}`,
+      `업무 상세: ${detailUrl}`,
+    ].join("\\n"),
+  );
+
+  const { error } = await supabase
+    .from("task_autopilot_jobs")
+    .update({
+      metadata: {
+        ...metadata,
+        discord_assignment_employee_id: task.assigned_employee_id,
+        discord_assignment_notified_at: new Date().toISOString(),
+      },
+    })
+    .eq("id", job.id);
+
+  if (error) throw new Error(error.message);
+
+  job.metadata = {
+    ...metadata,
+    discord_assignment_employee_id: task.assigned_employee_id,
+    discord_assignment_notified_at: new Date().toISOString(),
+  };
+}
+
+async function maybeSendWorkflowNotice(
+  supabase: any,
+  job: any,
+  task: any,
+  detailUrl: string,
+) {
+  if (!task.workflow_id) return;
+
+  const metadata = safeMetadata(job.metadata);
+  if (metadata.discord_workflow_notified === true) return;
+
+  const steps = await loadWorkflowSummary(supabase, task.id);
+
+  if (!steps.length) return;
+
+  const lines = steps.slice(0, 10).map((step: any) => {
+    const no = step.workflow_step_no ?? "-";
+    return `${no}. ${step.title} · ${step.status}`;
+  });
+
+  await sendDiscordChannelMessage(
+    "협업-진행상황",
+    [
+      "🤝 **AI 협업 업무 구성 완료**",
+      "",
+      `**${task.title || task.task_code}**`,
+      `협업 단계: ${steps.length}개`,
+      "",
+      ...lines,
+      "",
+      `업무 상세: ${detailUrl}`,
+    ].join("\\n"),
+  );
+
+  const { error } = await supabase
+    .from("task_autopilot_jobs")
+    .update({
+      metadata: {
+        ...safeMetadata(job.metadata),
+        discord_workflow_notified: true,
+        discord_workflow_notified_at: new Date().toISOString(),
+      },
+    })
+    .eq("id", job.id);
+
+  if (error) throw new Error(error.message);
+
+  job.metadata = {
+    ...safeMetadata(job.metadata),
+    discord_workflow_notified: true,
+    discord_workflow_notified_at: new Date().toISOString(),
+  };
+}
 
 async function loadLatestImageUrl(supabase: any, taskId: string) {
   const { data } = await supabase
@@ -128,14 +256,26 @@ export async function notifyDiscordForJob(
   const step = job.current_step_title || "다음 단계 준비";
   const detailUrl = taskUrl(task.id);
 
+  if (job.status === "QUEUED" || job.status === "RUNNING") {
+    await maybeSendAssignmentNotice(supabase, job, task, detailUrl);
+    await maybeSendWorkflowNotice(supabase, job, task, detailUrl);
+  }
+
   if (
     (job.status === "RUNNING" || job.status === "QUEUED") &&
     shouldSendProgress(job, previous)
   ) {
+    const isReviewStep = /검수|리뷰|review/i.test(step);
+    const progressChannel = isReviewStep
+      ? "검수-리뷰"
+      : task.workflow_id
+        ? "협업-진행상황"
+        : "업무-진행상황";
+
     await sendDiscordChannelMessage(
-      "업무-진행상황",
+      progressChannel,
       [
-        "🔄 **업무 진행 중**",
+        isReviewStep ? "🧪 **내부 검수 진행**" : "🔄 **업무 진행 중**",
         "",
         `**${title}**`,
         `상태: ${statusLabel(job.status)}`,
@@ -166,18 +306,6 @@ export async function notifyDiscordForJob(
         "AI 직원 협업과 내부 검수가 완료되었습니다.",
         "",
         `승인함: ${approvalsUrl()}`,
-        `업무 상세: ${detailUrl}`,
-      ].join("\n"),
-      { imageUrl },
-    );
-
-    await sendDiscordChannelMessage(
-      "업무-완료보고",
-      [
-        "✅ **AI 작업 완료 · 대표 확인 요청**",
-        "",
-        `**${title}**`,
-        "최종 결과가 승인 단계로 이동했습니다.",
         `업무 상세: ${detailUrl}`,
       ].join("\n"),
       { imageUrl },

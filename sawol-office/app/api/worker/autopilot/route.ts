@@ -3,7 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { runDurableWorkerOnce } from "@/lib/sawol/durable-worker";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 function isAuthorized(request: Request) {
   const secret = process.env.SAWOL_WORKER_SECRET;

@@ -2,6 +2,7 @@ import { after, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { verifyDiscordRequest } from "@/lib/discord/verify";
 import { createDiscordAutoTask } from "@/lib/discord/create-task";
+import { sendDiscordChannelMessage, taskUrl } from "@/lib/discord/notify";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -9,6 +10,21 @@ export const maxDuration = 60;
 function json(data: unknown, status = 200) {
   return NextResponse.json(data, { status });
 }
+
+async function safeChannelMessage(
+  channelName: string,
+  content: string,
+) {
+  try {
+    await sendDiscordChannelMessage(channelName, content);
+  } catch (error) {
+    console.error(
+      `Discord routing failed: ${channelName}`,
+      error,
+    );
+  }
+}
+
 
 async function editOriginalInteraction(
   applicationId: string,
@@ -150,18 +166,51 @@ export async function POST(request: Request) {
         },
       );
 
+      const detailUrl = taskUrl(task.id);
+
+      // 대표-업무지시는 대표의 지시창으로 유지합니다.
+      // Slash command 응답은 본인에게만 보이는 짧은 확인문으로만 남깁니다.
       await editOriginalInteraction(
         applicationId,
         interactionToken,
         [
-          "✅ **업무 접수 완료**",
+          "✅ 윤서진 비서실장에게 전달했습니다.",
+          `업무 코드: ${task.task_code}`,
+          "접수·분류·배정 현황은 비서실 채널에서 관리합니다.",
+        ].join("\n"),
+      );
+
+      await safeChannelMessage(
+        "윤서진-비서실",
+        [
+          "📥 **대표 업무 지시 접수**",
           "",
           `**${task.title}**`,
+          `업무 유형: ${task.task_type}`,
+          `우선순위: ${task.priority}`,
           `실행 방식: AUTO`,
           `업무 코드: ${task.task_code}`,
           "",
-          "윤서진 비서실장이 SAWOL OFFICE에 등록했습니다.",
-          "AI 직원 조직이 자동으로 처리하고 최종 결과는 승인 단계로 올립니다.",
+          "대표 지시를 접수했습니다. 업무 분석·분류·직원 배정을 시작합니다.",
+          `업무 상세: ${detailUrl}`,
+        ].join("\n"),
+      );
+
+      await safeChannelMessage(
+        "업무-접수기록",
+        [
+          "🗂️ **업무 접수 기록**",
+          "",
+          `업무 코드: ${task.task_code}`,
+          `제목: ${task.title}`,
+          `업무 유형: ${task.task_type}`,
+          `우선순위: ${task.priority}`,
+          `실행 방식: AUTO`,
+          "",
+          "**대표 원문**",
+          instruction.slice(0, 1400),
+          "",
+          `업무 상세: ${detailUrl}`,
         ].join("\n"),
       );
     } catch (error) {

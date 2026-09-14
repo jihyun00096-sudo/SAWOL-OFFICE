@@ -1,4 +1,3 @@
-import { GoogleGenAI } from "@google/genai";
 import type { AiTaskAsset, AiTaskResult, SawolAiContext } from "@/lib/ai/types";
 import { detectImageAspectRatio } from "@/lib/ai/image-policy";
 
@@ -29,11 +28,116 @@ function buildImagePrompt(context: SawolAiContext, result: AiTaskResult) {
     result.body.slice(0, 7000),
     "",
     "[제작 원칙]",
-    "- 대표 원문의 문구, 대상, 색상, 분위기, 형식 조건을 우선합니다.",
+    "- 대표 원문의 문구, 대상, 색상, 분위기, 형식 조건을 최우선으로 지킵니다.",
     "- 이미지 안에 글자가 필요하면 한글을 정확하고 읽기 쉽게 배치합니다.",
     "- 임의의 브랜드명, 수치, 인물, 로고, 사실을 추가하지 않습니다.",
     "- 최종 사용 가능한 완성 이미지 1장을 생성합니다.",
   ].join("\n");
+}
+
+type InteractionResponse = {
+  output_image?: {
+    data?: string;
+    mime_type?: string;
+    mimeType?: string;
+  } | null;
+  outputs?: Array<any>;
+  error?: {
+    code?: number;
+    message?: string;
+    status?: string;
+  };
+};
+
+function findOutputImage(payload: InteractionResponse) {
+  if (payload?.output_image?.data) {
+    return payload.output_image;
+  }
+
+  const stack = [...(payload?.outputs ?? [])];
+
+  while (stack.length) {
+    const item = stack.shift();
+    if (!item || typeof item !== "object") continue;
+
+    if (
+      item.type === "image" &&
+      typeof item.data === "string" &&
+      item.data.length > 0
+    ) {
+      return item;
+    }
+
+    for (const value of Object.values(item)) {
+      if (Array.isArray(value)) stack.push(...value);
+      else if (value && typeof value === "object") stack.push(value);
+    }
+  }
+
+  return null;
+}
+
+async function requestImage({
+  apiKey,
+  model,
+  prompt,
+  aspectRatio,
+  imageSize,
+}: {
+  apiKey: string;
+  model: string;
+  prompt: string;
+  aspectRatio: string;
+  imageSize: string;
+}) {
+  const response = await fetch(
+    "https://generativelanguage.googleapis.com/v1beta/interactions",
+    {
+      method: "POST",
+      headers: {
+        "x-goog-api-key": apiKey,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        input: prompt,
+        response_format: {
+          type: "image",
+          mime_type: "image/png",
+          aspect_ratio: aspectRatio,
+          image_size: imageSize,
+        },
+      }),
+      cache: "no-store",
+    },
+  );
+
+  const payload = (await response.json().catch(() => null)) as
+    | InteractionResponse
+    | null;
+
+  if (!response.ok) {
+    const detail =
+      payload?.error?.message ||
+      `HTTP ${response.status}`;
+
+    throw new Error(
+      `Gemini image interaction failed (${model}): ${detail}`,
+    );
+  }
+
+  const generatedImage = payload ? findOutputImage(payload) : null;
+
+  if (!generatedImage?.data) {
+    throw new Error(
+      `Gemini image interaction returned no image (${model}).`,
+    );
+  }
+
+  return {
+    generatedImage,
+    model,
+  };
 }
 
 export async function generateGeminiImageAsset({
@@ -44,55 +148,70 @@ export async function generateGeminiImageAsset({
   result: AiTaskResult;
 }): Promise<AiTaskAsset> {
   const apiKey = process.env.GEMINI_API_KEY;
+
   if (!apiKey) {
     throw new Error("이미지 생성에 필요한 GEMINI_API_KEY가 없습니다.");
   }
 
-  const model = process.env.GEMINI_IMAGE_MODEL || "gemini-3.1-flash-image";
+  const requestedModel =
+    process.env.GEMINI_IMAGE_MODEL || "gemini-3.1-flash-image";
+
+  const fallbackModel =
+    process.env.GEMINI_IMAGE_FALLBACK_MODEL ||
+    "gemini-2.5-flash-image";
+
   const imageSize = boundedImageSize(process.env.GEMINI_IMAGE_SIZE);
   const aspectRatio = detectImageAspectRatio(context);
   const prompt = buildImagePrompt(context, result);
 
-  const ai = new GoogleGenAI({ apiKey });
+  let generatedImage: any;
+  let usedModel = requestedModel;
 
-  // @google/genai의 Interactions API를 사용합니다.
-  // SDK 버전별 타입 정의 차이를 피하기 위해 런타임 객체를 좁혀 사용합니다.
-  const interactions = (ai as any).interactions;
-  if (!interactions?.create) {
-    throw new Error(
-      "@google/genai 버전이 Gemini 이미지 Interactions API를 지원하지 않습니다.",
-    );
-  }
+  try {
+    const first = await requestImage({
+      apiKey,
+      model: requestedModel,
+      prompt,
+      aspectRatio,
+      imageSize,
+    });
+    generatedImage = first.generatedImage;
+    usedModel = first.model;
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : String(error);
 
-  const interaction = await interactions.create({
-    model,
-    input: prompt,
-    response_format: {
-      type: "image",
-      aspect_ratio: aspectRatio,
-      image_size: imageSize,
-    },
-  });
+    const retryableModelError =
+      /404|NOT_FOUND|not found|not supported/i.test(message);
 
-  const generatedImage = interaction?.output_image;
-  const data = generatedImage?.data;
+    if (!retryableModelError || fallbackModel === requestedModel) {
+      throw error;
+    }
 
-  if (!data || typeof data !== "string") {
-    throw new Error("Gemini 이미지 응답에 실제 이미지 데이터가 없습니다.");
+    const fallback = await requestImage({
+      apiKey,
+      model: fallbackModel,
+      prompt,
+      aspectRatio,
+      imageSize: "1K",
+    });
+
+    generatedImage = fallback.generatedImage;
+    usedModel = fallback.model;
   }
 
   return {
     kind: "IMAGE",
-    dataBase64: data,
+    dataBase64: generatedImage.data,
     url: null,
     storagePath: null,
     mimeType:
-      generatedImage?.mime_type ||
-      generatedImage?.mimeType ||
+      generatedImage.mime_type ||
+      generatedImage.mimeType ||
       "image/png",
     prompt,
-    model,
+    model: usedModel,
     aspectRatio,
-    imageSize,
+    imageSize: usedModel === fallbackModel ? "1K" : imageSize,
   };
 }

@@ -1,0 +1,37 @@
+-- STEP23-3.6 이미지 Worker 복구
+-- 코드 배포가 Ready 된 뒤 1회 실행하세요.
+
+update public.task_autopilot_jobs j
+set
+  status = 'QUEUED',
+  progress = 0,
+  current_step_title = null,
+  last_error = null,
+  last_message = 'STEP23-3.6 이미지 생성 경로 수정 후 자동 재실행 대기 중입니다.',
+  finished_at = null,
+  heartbeat_at = now(),
+  updated_at = now()
+from public.tasks t
+where j.task_id = t.id
+  and t.execution_mode = 'AUTO'
+  and t.status = 'WAITING'
+  and j.status = 'FAILED'
+  and (
+    j.last_error ilike '%gemini-3.1-flash-image%'
+    or j.last_error ilike '%generateContent%'
+    or j.last_error ilike '%image interaction%'
+  );
+
+select
+  t.task_code,
+  t.status as task_status,
+  j.status as job_status,
+  j.progress,
+  j.last_message,
+  j.last_error
+from public.tasks t
+join public.task_autopilot_jobs j
+  on j.task_id = t.id
+where t.execution_mode = 'AUTO'
+order by j.updated_at desc
+limit 20;
