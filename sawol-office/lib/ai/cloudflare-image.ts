@@ -111,7 +111,6 @@ export async function generateCloudflareImageAsset({
     body: JSON.stringify({
       prompt: prompt.slice(0, 2048),
       steps: 4,
-      seed: Math.floor(Math.random() * 2147483647),
     }),
     cache: "no-store",
   });
