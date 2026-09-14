@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AiExecuteButton } from "@/components/sawol/ai-execute-button";
@@ -54,6 +55,9 @@ export default async function RunDetailPage({
   const metadata = metadataObject(run.metadata);
   const step20 = metadataObject(metadata.step20);
   const sources = Array.isArray(step20.sources) ? step20.sources : [];
+  const asset = metadataObject(step20.asset);
+  const imageUrl =
+    typeof asset.url === "string" && asset.url.trim() ? asset.url : null;
 
   const provider = getAiProviderName();
   const providerLabel = getAiProviderDisplayName(provider);
@@ -179,6 +183,22 @@ export default async function RunDetailPage({
             <p className="mt-4 rounded-[12px] bg-[#F7F8FA] px-4 py-3 text-[11px] leading-5 text-[#666C76]">
               {run.result_summary}
             </p>
+          ) : null}
+
+          {imageUrl ? (
+            <div className="mt-5 overflow-hidden rounded-[16px] border border-[#E7E9EE] bg-[#F8F9FB] p-3">
+              <img
+                src={imageUrl}
+                alt={run.result_title || task?.title || "생성 이미지"}
+                className="mx-auto max-h-[760px] w-auto max-w-full rounded-[12px] object-contain"
+              />
+              <div className="mt-3 flex flex-wrap items-center gap-2 text-[9px] text-[#8A909A]">
+                <span>이미지 결과</span>
+                {asset.aspectRatio ? <span>비율 {asset.aspectRatio}</span> : null}
+                {asset.imageSize ? <span>크기 {asset.imageSize}</span> : null}
+                {asset.model ? <span>{asset.model}</span> : null}
+              </div>
+            </div>
           ) : null}
 
           <div className="mt-5 min-w-0 max-w-full whitespace-pre-wrap break-words [overflow-wrap:anywhere] overflow-hidden text-[12px] leading-7 text-[#444A54]">

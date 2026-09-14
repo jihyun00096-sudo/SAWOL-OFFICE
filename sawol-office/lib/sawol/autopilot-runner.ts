@@ -3,6 +3,7 @@ import { createHumanCode } from "@/lib/sawol/code";
 import type { SawolAiContext } from "@/lib/ai/types";
 import { shouldUseWebResearch } from "@/lib/ai/research-policy";
 import { ResearchInsufficientError } from "@/lib/ai/free-web-research";
+import { persistGeneratedImageAsset } from "@/lib/ai/image-storage";
 
 export type AutopilotStepResult = {
   ok: true;
@@ -160,6 +161,16 @@ async function executeTask(supabase: any, task: any) {
 
     const now = new Date().toISOString();
 
+    const persistedAsset = ai.result.asset?.dataBase64
+      ? await persistGeneratedImageAsset(supabase, {
+          taskId: task.id,
+          runId: run.id,
+          asset: ai.result.asset,
+        })
+      : ai.result.asset ?? null;
+
+    ai.result.asset = persistedAsset;
+
     const { error: saveError } = await supabase
       .from("task_runs")
       .update({
@@ -180,6 +191,13 @@ async function executeTask(supabase: any, task: any) {
           autopilot: true,
           confidence: ai.result.confidence,
           sources: ai.result.sources,
+          step20: {
+            used_web_search: ai.usedWebSearch,
+            confidence: ai.result.confidence,
+            needs_human_review: ai.result.needs_human_review,
+            sources: ai.result.sources,
+            asset: persistedAsset,
+          },
         },
         updated_at: now,
       })
@@ -191,6 +209,8 @@ async function executeTask(supabase: any, task: any) {
 
     return {
       runId: run.id,
+      provider: ai.provider,
+      model: ai.model,
       result: ai.result,
     };
   } catch (error) {
@@ -389,7 +409,7 @@ export async function runAutopilotStep(
   }
 
   try {
-    const { result } = await executeTask(supabase, next);
+    const { result, provider, model } = await executeTask(supabase, next);
 
     const completedAt = new Date().toISOString();
 
@@ -407,6 +427,41 @@ export async function runAutopilotStep(
       .select("status")
       .eq("id", root.id)
       .maybeSingle();
+
+    // 협업 최종 이미지가 생성된 경우, DB 트리거가 만든 root 최종 RUN에도
+    // 이미지 metadata를 복사해 승인/결과함/Discord가 동일한 이미지를 사용하게 합니다.
+    if (result.asset?.url) {
+      const { data: rootRuns } = await supabase
+        .from("task_runs")
+        .select("id,metadata")
+        .eq("task_id", root.id)
+        .order("created_at", { ascending: false })
+        .limit(5);
+
+      const workflowFinalRun = (rootRuns ?? []).find(
+        (item: any) => item?.metadata?.workflow_final === true,
+      );
+
+      if (workflowFinalRun?.id) {
+        await supabase
+          .from("task_runs")
+          .update({
+            provider,
+            model,
+            metadata: {
+              ...(workflowFinalRun.metadata ?? {}),
+              step20: {
+                confidence: result.confidence,
+                needs_human_review: result.needs_human_review,
+                sources: result.sources,
+                asset: result.asset,
+              },
+            },
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", workflowFinalRun.id);
+      }
+    }
 
     const done = completed + 1;
     const progress = rows.length

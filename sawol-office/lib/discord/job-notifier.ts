@@ -85,6 +85,23 @@ async function loadTask(supabase: any, taskId: string) {
   return data;
 }
 
+
+async function loadLatestImageUrl(supabase: any, taskId: string) {
+  const { data } = await supabase
+    .from("task_runs")
+    .select("metadata")
+    .eq("task_id", taskId)
+    .order("created_at", { ascending: false })
+    .limit(5);
+
+  for (const row of data ?? []) {
+    const url = row?.metadata?.step20?.asset?.url;
+    if (typeof url === "string" && url.trim()) return url;
+  }
+
+  return null;
+}
+
 export async function notifyDiscordForJob(
   supabase: any,
   job: any,
@@ -137,6 +154,8 @@ export async function notifyDiscordForJob(
   }
 
   if (job.status === "AWAITING_APPROVAL") {
+    const imageUrl = await loadLatestImageUrl(supabase, task.id);
+
     await sendDiscordChannelMessage(
       "대표-승인대기",
       [
@@ -149,6 +168,7 @@ export async function notifyDiscordForJob(
         `승인함: ${approvalsUrl()}`,
         `업무 상세: ${detailUrl}`,
       ].join("\n"),
+      { imageUrl },
     );
 
     await sendDiscordChannelMessage(
@@ -160,6 +180,7 @@ export async function notifyDiscordForJob(
         "최종 결과가 승인 단계로 이동했습니다.",
         `업무 상세: ${detailUrl}`,
       ].join("\n"),
+      { imageUrl },
     );
 
     await markNotified(supabase, job, signature);
@@ -220,6 +241,8 @@ export async function notifyDiscordForJob(
   }
 
   if (job.status === "COMPLETED") {
+    const imageUrl = await loadLatestImageUrl(supabase, task.id);
+
     await sendDiscordChannelMessage(
       "업무-완료보고",
       [
@@ -229,6 +252,7 @@ export async function notifyDiscordForJob(
         `업무 코드: ${task.task_code ?? "-"}`,
         `업무 상세: ${detailUrl}`,
       ].join("\n"),
+      { imageUrl },
     );
 
     await markNotified(supabase, job, signature);

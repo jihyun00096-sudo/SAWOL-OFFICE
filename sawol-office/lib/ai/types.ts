@@ -4,6 +4,19 @@ export type AiResultSource = {
   note: string;
 };
 
+export type AiTaskAsset = {
+  kind: "IMAGE";
+  url?: string | null;
+  storagePath?: string | null;
+  mimeType: string;
+  prompt: string;
+  model: string;
+  aspectRatio: string;
+  imageSize: string;
+  /** 서버에서 Storage에 올리기 전까지만 사용하는 임시 데이터 */
+  dataBase64?: string | null;
+};
+
 export type AiTaskResult = {
   title: string;
   summary: string;
@@ -11,6 +24,7 @@ export type AiTaskResult = {
   confidence: number;
   needs_human_review: boolean;
   sources: AiResultSource[];
+  asset?: AiTaskAsset | null;
 };
 
 export type SawolAiContext = {

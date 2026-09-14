@@ -6,6 +6,8 @@ import {
 import { runMockTask } from "@/lib/ai/mock";
 import { runOpenAiTask } from "@/lib/ai/openai";
 import { runGeminiTask } from "@/lib/ai/gemini";
+import { generateGeminiImageAsset } from "@/lib/ai/gemini-image";
+import { shouldGenerateImageForContext } from "@/lib/ai/image-policy";
 
 export type AiProviderName = "mock" | "openai" | "gemini";
 
@@ -49,11 +51,20 @@ export async function executeAiTask({
   }
 
   if (provider === "gemini") {
-    return runGeminiTask({
+    const response = await runGeminiTask({
       systemPrompt,
       userPrompt,
       useWebSearch,
     });
+
+    if (shouldGenerateImageForContext(context)) {
+      response.result.asset = await generateGeminiImageAsset({
+        context,
+        result: response.result,
+      });
+    }
+
+    return response;
   }
 
   return runOpenAiTask({

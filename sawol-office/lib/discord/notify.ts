@@ -64,6 +64,7 @@ async function findChannelId(name: string) {
 export async function sendDiscordChannelMessage(
   channelName: string,
   content: string,
+  options?: { imageUrl?: string | null },
 ) {
   const channelId = await findChannelId(channelName);
 
@@ -75,6 +76,15 @@ export async function sendDiscordChannelMessage(
     method: "POST",
     body: JSON.stringify({
       content: content.slice(0, 1900),
+      embeds: options?.imageUrl
+        ? [
+            {
+              image: {
+                url: options.imageUrl,
+              },
+            },
+          ]
+        : undefined,
       allowed_mentions: {
         parse: [],
       },

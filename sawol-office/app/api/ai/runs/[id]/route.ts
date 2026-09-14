@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { executeAiTask } from "@/lib/ai/provider";
 import type { SawolAiContext } from "@/lib/ai/types";
 import { shouldUseWebResearch } from "@/lib/ai/research-policy";
+import { persistGeneratedImageAsset } from "@/lib/ai/image-storage";
 
 export const runtime = "nodejs";
 export const maxDuration = 180;
@@ -148,6 +149,16 @@ export async function POST(
 
     const finishedAt = new Date().toISOString();
 
+    const persistedAsset = ai.result.asset?.dataBase64
+      ? await persistGeneratedImageAsset(supabase, {
+          taskId: task.id,
+          runId: id,
+          asset: ai.result.asset,
+        })
+      : ai.result.asset ?? null;
+
+    ai.result.asset = persistedAsset;
+
     const previousMetadata =
       run.metadata &&
       typeof run.metadata === "object" &&
@@ -176,6 +187,7 @@ export async function POST(
             confidence: ai.result.confidence,
             needs_human_review: ai.result.needs_human_review,
             sources: ai.result.sources,
+            asset: persistedAsset,
           },
         },
         updated_at: finishedAt,

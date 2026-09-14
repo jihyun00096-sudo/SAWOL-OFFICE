@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { DetailSection } from "@/components/sawol/detail-section";
@@ -63,6 +64,15 @@ export default async function ResultDetailPage({
     ]);
 
   const metadata = metadataObject(result.metadata);
+  const asset = metadataObject(metadata.asset);
+  const imageUrl =
+    (typeof result.file_url === "string" && result.file_url.trim()
+      ? result.file_url
+      : null) ||
+    (typeof result.external_url === "string" && result.external_url.trim()
+      ? result.external_url
+      : null) ||
+    (typeof asset.url === "string" && asset.url.trim() ? asset.url : null);
 
   return (
     <OfficeShell pendingApprovals={pendingApprovals ?? 0}>
@@ -181,6 +191,16 @@ export default async function ResultDetailPage({
 
       <div className="mt-4">
         <DetailSection title="결과 내용">
+          {result.result_type === "IMAGE" && imageUrl ? (
+            <div className="mb-5 overflow-hidden rounded-[16px] border border-[#E7E9EE] bg-[#F8F9FB] p-3">
+              <img
+                src={imageUrl}
+                alt={result.title}
+                className="mx-auto max-h-[760px] w-auto max-w-full rounded-[12px] object-contain"
+              />
+            </div>
+          ) : null}
+
           <div className="min-w-0 max-w-full whitespace-pre-wrap break-words [overflow-wrap:anywhere] overflow-hidden text-[11px] leading-7 text-[#555B65]">
             {result.content ?? "저장된 결과 내용이 없습니다."}
           </div>
