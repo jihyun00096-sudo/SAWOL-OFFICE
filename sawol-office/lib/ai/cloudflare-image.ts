@@ -1,4 +1,4 @@
-import type { AiTaskAsset, AiTaskResult, SawolAiContext } from "@/lib/ai/types";
+import type { AiTaskAsset, SawolAiContext } from "@/lib/ai/types";
 import { detectImageAspectRatio } from "@/lib/ai/image-policy";
 
 const FREE_IMAGE_MODEL = "@cf/black-forest-labs/flux-1-schnell";
@@ -12,77 +12,49 @@ function originalRequestText(context: SawolAiContext) {
   const task = context.task ?? {};
 
   const title = textOf(root.title) || textOf(task.title);
-  const description =
-    textOf(root.description) ||
-    textOf(task.description);
+  const description = textOf(root.description) || textOf(task.description);
 
-  return [title, description].filter(Boolean).join("\n").trim();
+  if (description && description !== title) {
+    return `${title}\n${description}`.trim();
+  }
+
+  return title.trim();
 }
 
-function hasExplicitTextRequest(request: string) {
-  return /(문구|텍스트|글씨|제목|타이틀|카피|슬로건|로고명|이름|표기|써줘|적어줘|넣어줘|write|text|title|headline|caption)/i.test(
+function explicitlyRequestsText(request: string) {
+  return /(문구|텍스트|글씨|타이포|타이틀|제목|카피|슬로건|로고|표기|써줘|적어줘|넣어줘|write|text|title|headline|caption|typography)/i.test(
     request,
   );
 }
 
-function hasOfficeSignal(request: string) {
-  return /(사무실|오피스|office|회의실|책상|의자|회사 내부|workspace)/i.test(
-    request,
-  );
-}
-
-function buildImagePrompt(context: SawolAiContext, result: AiTaskResult) {
+function buildImagePrompt(context: SawolAiContext) {
   const request = originalRequestText(context);
   const aspectRatio = detectImageAspectRatio(context);
-  const explicitText = hasExplicitTextRequest(request);
-  const officeRequested = hasOfficeSignal(request);
+  const wantsText = explicitlyRequestsText(request);
 
-  const rules = [
-    "Create exactly ONE image that follows the user's original request literally.",
-    "The original request below is the PRIMARY and HIGHEST-PRIORITY instruction.",
-    "Do not reinterpret the request as a SAWOL OFFICE scene, workplace scene, company scene, dashboard, office interior, or business presentation.",
-    "Do not add objects, scenery, furniture, architecture, signs, logos, people, brands, or themes that the user did not request.",
-    "Do not replace the requested main subject with a metaphor, workplace concept, or abstract concept.",
-    "Make the requested main subject immediately obvious and dominant in the image.",
-    `Compose for an approximate ${aspectRatio} layout.`,
+  const lines = [
+    "Create one polished image that faithfully depicts the following user request.",
+    "",
+    "USER REQUEST:",
+    request || "Create the requested image.",
+    "",
+    "GENERATION GUIDANCE:",
+    "- Make the requested main subject clearly visible and dominant.",
+    "- Preserve the requested setting, colors, mood, style, and composition.",
+    "- Add only visual elements that naturally belong to the requested scene.",
+    `- Compose the scene for an approximate ${aspectRatio} layout.`,
   ];
 
-  if (!explicitText) {
-    rules.push(
-      "ABSOLUTELY NO TEXT: no letters, no words, no Korean characters, no English text, no signs, no labels, no typography, no watermarks.",
-    );
+  if (!wantsText) {
+    lines.push("- Keep the image free of text, lettering, labels, signs, and watermarks.");
   } else {
-    rules.push(
-      "Only include text that the user explicitly requested. Do not invent any additional wording.",
-      "If exact Korean typography cannot be rendered reliably, prefer a clean area reserved for text rather than inventing broken or fake Korean characters.",
+    lines.push(
+      "- Include only wording explicitly requested by the user.",
+      "- Do not invent additional wording.",
     );
   }
 
-  if (!officeRequested) {
-    rules.push(
-      "Do not depict an office, meeting room, desk, chair, windowed workplace, corporate interior, or office signage.",
-    );
-  }
-
-  return [
-    "IMAGE GENERATION TASK",
-    "",
-    "[ORIGINAL USER REQUEST — FOLLOW THIS LITERALLY]",
-    request || "(No request text available)",
-    "",
-    "[STRICT RULES]",
-    ...rules.map((rule) => `- ${rule}`),
-    "",
-    "[SECONDARY CONTEXT — USE ONLY IF IT HELPS, NEVER OVERRIDE THE ORIGINAL REQUEST]",
-    result.summary || "",
-    "",
-    "Final check before generating:",
-    "1. Is the requested subject actually present?",
-    "2. Are the requested colors/background/style present?",
-    "3. Did you avoid all unrequested office/business elements?",
-    "4. Did you avoid unrequested text?",
-    "If any answer is no, fix the image before returning it.",
-  ].join("\n");
+  return lines.join("\n");
 }
 
 type CloudflareEnvelope = {
@@ -129,10 +101,8 @@ function freeOnlyError(message: string) {
 
 export async function generateCloudflareImageAsset({
   context,
-  result,
 }: {
   context: SawolAiContext;
-  result: AiTaskResult;
 }): Promise<AiTaskAsset> {
   const accountId = process.env.CLOUDFLARE_ACCOUNT_ID?.trim();
   const apiToken = process.env.CLOUDFLARE_API_TOKEN?.trim();
@@ -143,9 +113,10 @@ export async function generateCloudflareImageAsset({
     );
   }
 
-  // FREE-ONLY: 이 모델 외의 유료 이미지 모델로 자동 전환하지 않습니다.
+  // FREE-ONLY:
+  // 이미지 모델은 FLUX.1 Schnell 하나로 고정하고 유료 모델로 fallback하지 않습니다.
   const model = FREE_IMAGE_MODEL;
-  const prompt = buildImagePrompt(context, result);
+  const prompt = buildImagePrompt(context);
   const aspectRatio = detectImageAspectRatio(context);
 
   const endpoint =

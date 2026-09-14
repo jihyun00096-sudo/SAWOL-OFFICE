@@ -74,6 +74,11 @@ export default async function ResultDetailPage({
       : null) ||
     (typeof asset.url === "string" && asset.url.trim() ? asset.url : null);
 
+  const imageModel =
+    typeof asset.model === "string" && asset.model.trim()
+      ? asset.model
+      : metadata.model ?? "-";
+
   return (
     <OfficeShell pendingApprovals={pendingApprovals ?? 0}>
       <PageHeader
@@ -170,9 +175,11 @@ export default async function ResultDetailPage({
             <div>
               <dt className="text-[#999EA7]">생성 방식</dt>
               <dd className="mt-1.5">
-                {metadata.provider || metadata.source === "task_run"
-                  ? `${metadata.provider ?? "AI"} · ${metadata.model ?? "모델 정보 없음"}`
-                  : "직접 등록"}
+                {result.result_type === "IMAGE" && imageUrl
+                  ? `Cloudflare Workers AI · ${imageModel} · FREE-ONLY`
+                  : metadata.provider || metadata.source === "task_run"
+                    ? `${metadata.provider ?? "AI"} · ${metadata.model ?? "모델 정보 없음"}`
+                    : "직접 등록"}
               </dd>
             </div>
             <div>
@@ -198,6 +205,9 @@ export default async function ResultDetailPage({
                 alt={result.title}
                 className="mx-auto max-h-[760px] w-auto max-w-full rounded-[12px] object-contain"
               />
+              <p className="mt-3 text-[9px] text-[#8A909A]">
+                이미지 생성 AI · Cloudflare Workers AI · {imageModel} · 대표 승인본
+              </p>
             </div>
           ) : null}
 

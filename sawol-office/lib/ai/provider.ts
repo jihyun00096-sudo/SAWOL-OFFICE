@@ -1,4 +1,7 @@
-import type { SawolAiContext } from "@/lib/ai/types";
+import type {
+  AiTaskResult,
+  SawolAiContext,
+} from "@/lib/ai/types";
 import {
   buildSawolSystemPrompt,
   buildSawolUserPrompt,
@@ -10,6 +13,51 @@ import { generateCloudflareImageAsset } from "@/lib/ai/cloudflare-image";
 import { shouldGenerateImageForContext } from "@/lib/ai/image-policy";
 
 export type AiProviderName = "mock" | "openai" | "gemini";
+
+function textOf(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function originalImageRequest(context: SawolAiContext) {
+  const root = context.rootTask ?? {};
+  const task = context.task ?? {};
+
+  const title = textOf(root.title) || textOf(task.title) || "이미지 제작";
+  const description = textOf(root.description) || textOf(task.description);
+
+  return {
+    title,
+    description:
+      description && description !== title ? description : "",
+  };
+}
+
+function buildDirectImageResult(
+  context: SawolAiContext,
+): AiTaskResult {
+  const original = originalImageRequest(context);
+
+  return {
+    title: `${original.title} · 이미지 생성 결과`,
+    summary:
+      "대표 원문을 직접 기준으로 무료 이미지 모델에서 이미지를 생성했습니다. 이미지 내용 적합성은 대표 확인이 필요합니다.",
+    body: [
+      "생성된 이미지가 이번 업무의 최종 산출물입니다.",
+      "",
+      "[대표 원문]",
+      original.title,
+      original.description,
+      "",
+      "[검수 상태]",
+      "자동 적합성 판정은 하지 않았습니다. 생성 이미지의 피사체·장소·색상·문구가 원문과 맞는지 대표 확인이 필요합니다.",
+    ]
+      .filter(Boolean)
+      .join("\n"),
+    confidence: 50,
+    needs_human_review: true,
+    sources: [],
+  };
+}
 
 export function getAiProviderName(): AiProviderName {
   const value = (
@@ -42,6 +90,29 @@ export async function executeAiTask({
   context: SawolAiContext;
   useWebSearch: boolean;
 }) {
+  // IMAGE PIPELINE:
+  // 이미지 업무는 일반 텍스트 업무와 완전히 분리합니다.
+  // Gemini 프롬프트/회사 기억/직원 문맥을 거치지 않고 대표 원문만 Cloudflare로 전달합니다.
+  if (shouldGenerateImageForContext(context)) {
+    const result = buildDirectImageResult(context);
+    const asset = await generateCloudflareImageAsset({ context });
+
+    result.asset = asset;
+
+    return {
+      provider: "cloudflare",
+      model: asset.model,
+      responseId: null,
+      usage: {
+        mode: "FREE_ONLY_IMAGE",
+        billing_fallback: false,
+      },
+      result,
+      usedWebSearch: false,
+      requestedWebSearch: false,
+    };
+  }
+
   const provider = getAiProviderName();
   const systemPrompt = buildSawolSystemPrompt(context);
   const userPrompt = buildSawolUserPrompt(context);
@@ -51,22 +122,11 @@ export async function executeAiTask({
   }
 
   if (provider === "gemini") {
-    const response = await runGeminiTask({
+    return runGeminiTask({
       systemPrompt,
       userPrompt,
       useWebSearch,
     });
-
-    // 텍스트 판단/제작안은 기존 Gemini 무료 경로를 유지합니다.
-    // 실제 이미지가 필요한 업무만 Cloudflare Workers AI 무료 모델을 사용합니다.
-    if (shouldGenerateImageForContext(context)) {
-      response.result.asset = await generateCloudflareImageAsset({
-        context,
-        result: response.result,
-      });
-    }
-
-    return response;
   }
 
   return runOpenAiTask({

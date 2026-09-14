@@ -58,6 +58,11 @@ export default async function RunDetailPage({
   const asset = metadataObject(step20.asset);
   const imageUrl =
     typeof asset.url === "string" && asset.url.trim() ? asset.url : null;
+  const isImageResult = Boolean(imageUrl);
+  const imageModel =
+    typeof asset.model === "string" && asset.model.trim()
+      ? asset.model
+      : run.model ?? "-";
 
   const provider = getAiProviderName();
   const providerLabel = getAiProviderDisplayName(provider);
@@ -119,12 +124,21 @@ export default async function RunDetailPage({
         </div>
 
         <div className="rounded-[16px] border border-[#E7E9EE] bg-white p-4">
-          <p className="text-[9px] text-[#9499A3]">AI Provider</p>
-          <p className="mt-2 break-words text-[11px] font-semibold">
-            {run.provider
-              ? `${run.provider} · ${run.model ?? "-"}`
-              : `${providerLabel} · ${configuredModel}`}
+          <p className="text-[9px] text-[#9499A3]">
+            {isImageResult ? "이미지 AI" : "AI Provider"}
           </p>
+          <p className="mt-2 break-words text-[11px] font-semibold">
+            {isImageResult
+              ? `Cloudflare Workers AI · ${imageModel}`
+              : run.provider
+                ? `${run.provider} · ${run.model ?? "-"}`
+                : `${providerLabel} · ${configuredModel}`}
+          </p>
+          {isImageResult ? (
+            <p className="mt-1 text-[9px] text-[#8B919C]">
+              무료 전용 이미지 생성 · 유료 fallback 없음
+            </p>
+          ) : null}
         </div>
       </section>
 
@@ -165,7 +179,13 @@ export default async function RunDetailPage({
               </h2>
             </div>
 
-            {typeof step20.confidence === "number" ? (
+            {isImageResult ? (
+              <div className="flex flex-wrap gap-2">
+                <span className="rounded-full bg-[#FFF5DD] px-2.5 py-1 text-[9px] text-[#8A6824]">
+                  이미지 생성 완료 · 대표 검토 필요
+                </span>
+              </div>
+            ) : typeof step20.confidence === "number" ? (
               <div className="flex flex-wrap gap-2">
                 <span className="rounded-full bg-[#F2F4F7] px-2.5 py-1 text-[9px] text-[#666C76]">
                   신뢰도 {step20.confidence}%
@@ -197,6 +217,7 @@ export default async function RunDetailPage({
                 {asset.aspectRatio ? <span>비율 {asset.aspectRatio}</span> : null}
                 {asset.imageSize ? <span>크기 {asset.imageSize}</span> : null}
                 {asset.model ? <span>{asset.model}</span> : null}
+                <span>자동 적합성 미판정</span>
               </div>
             </div>
           ) : null}
@@ -205,7 +226,7 @@ export default async function RunDetailPage({
             {run.result_body}
           </div>
 
-          {sources.length ? (
+          {!isImageResult && sources.length ? (
             <div className="mt-6 border-t border-[#ECEEF2] pt-5">
               <p className="text-[10px] font-semibold">참고 출처</p>
               <div className="mt-3 space-y-2">
@@ -238,7 +259,11 @@ export default async function RunDetailPage({
             </div>
           ) : null}
 
-          {run.provider ? (
+          {isImageResult ? (
+            <div className="mt-6 border-t border-[#ECEEF2] pt-4 text-[9px] text-[#A0A5AE]">
+              이미지 생성 · Cloudflare Workers AI · {imageModel} · FREE-ONLY
+            </div>
+          ) : run.provider ? (
             <div className="mt-6 border-t border-[#ECEEF2] pt-4 text-[9px] text-[#A0A5AE]">
               AI 실행 · {run.provider} · {run.model ?? "-"}
               {run.provider === "mock" ? " · 테스트 비용 0원" : ""}
