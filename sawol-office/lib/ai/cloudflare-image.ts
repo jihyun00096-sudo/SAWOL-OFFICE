@@ -4,33 +4,84 @@ import { detectImageAspectRatio } from "@/lib/ai/image-policy";
 const FREE_IMAGE_MODEL = "@cf/black-forest-labs/flux-1-schnell";
 
 function textOf(value: unknown) {
-  return typeof value === "string" ? value : "";
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function originalRequestText(context: SawolAiContext) {
+  const root = context.rootTask ?? {};
+  const task = context.task ?? {};
+
+  const title = textOf(root.title) || textOf(task.title);
+  const description =
+    textOf(root.description) ||
+    textOf(task.description);
+
+  return [title, description].filter(Boolean).join("\n").trim();
+}
+
+function hasExplicitTextRequest(request: string) {
+  return /(문구|텍스트|글씨|제목|타이틀|카피|슬로건|로고명|이름|표기|써줘|적어줘|넣어줘|write|text|title|headline|caption)/i.test(
+    request,
+  );
+}
+
+function hasOfficeSignal(request: string) {
+  return /(사무실|오피스|office|회의실|책상|의자|회사 내부|workspace)/i.test(
+    request,
+  );
 }
 
 function buildImagePrompt(context: SawolAiContext, result: AiTaskResult) {
-  const task = context.task ?? {};
-  const root = context.rootTask ?? {};
-  const originalTitle = textOf(root.title) || textOf(task.title);
-  const originalDescription =
-    textOf(root.description) || textOf(task.description) || originalTitle;
+  const request = originalRequestText(context);
   const aspectRatio = detectImageAspectRatio(context);
+  const explicitText = hasExplicitTextRequest(request);
+  const officeRequested = hasOfficeSignal(request);
+
+  const rules = [
+    "Create exactly ONE image that follows the user's original request literally.",
+    "The original request below is the PRIMARY and HIGHEST-PRIORITY instruction.",
+    "Do not reinterpret the request as a SAWOL OFFICE scene, workplace scene, company scene, dashboard, office interior, or business presentation.",
+    "Do not add objects, scenery, furniture, architecture, signs, logos, people, brands, or themes that the user did not request.",
+    "Do not replace the requested main subject with a metaphor, workplace concept, or abstract concept.",
+    "Make the requested main subject immediately obvious and dominant in the image.",
+    `Compose for an approximate ${aspectRatio} layout.`,
+  ];
+
+  if (!explicitText) {
+    rules.push(
+      "ABSOLUTELY NO TEXT: no letters, no words, no Korean characters, no English text, no signs, no labels, no typography, no watermarks.",
+    );
+  } else {
+    rules.push(
+      "Only include text that the user explicitly requested. Do not invent any additional wording.",
+      "If exact Korean typography cannot be rendered reliably, prefer a clean area reserved for text rather than inventing broken or fake Korean characters.",
+    );
+  }
+
+  if (!officeRequested) {
+    rules.push(
+      "Do not depict an office, meeting room, desk, chair, windowed workplace, corporate interior, or office signage.",
+    );
+  }
 
   return [
-    "Create the final image deliverable for SAWOL OFFICE.",
+    "IMAGE GENERATION TASK",
     "",
-    "[Original request]",
-    originalTitle,
-    originalDescription,
+    "[ORIGINAL USER REQUEST — FOLLOW THIS LITERALLY]",
+    request || "(No request text available)",
     "",
-    "[AI staff production brief]",
-    result.body.slice(0, 6500),
+    "[STRICT RULES]",
+    ...rules.map((rule) => `- ${rule}`),
     "",
-    "[Rules]",
-    "- Follow the original request first.",
-    "- Do not invent brands, logos, people, numbers, or facts that were not requested.",
-    "- If Korean copy is requested, keep the Korean wording exactly as provided.",
-    `- Compose the image visually for an approximate ${aspectRatio} layout.`,
-    "- Produce one polished, practical final image.",
+    "[SECONDARY CONTEXT — USE ONLY IF IT HELPS, NEVER OVERRIDE THE ORIGINAL REQUEST]",
+    result.summary || "",
+    "",
+    "Final check before generating:",
+    "1. Is the requested subject actually present?",
+    "2. Are the requested colors/background/style present?",
+    "3. Did you avoid all unrequested office/business elements?",
+    "4. Did you avoid unrequested text?",
+    "If any answer is no, fix the image before returning it.",
   ].join("\n");
 }
 
@@ -92,8 +143,7 @@ export async function generateCloudflareImageAsset({
     );
   }
 
-  // 비용 방지를 위해 모델명을 환경변수로 열지 않습니다.
-  // SAWOL OFFICE의 이미지 생성은 무료 테스트용 FLUX.1 Schnell만 사용합니다.
+  // FREE-ONLY: 이 모델 외의 유료 이미지 모델로 자동 전환하지 않습니다.
   const model = FREE_IMAGE_MODEL;
   const prompt = buildImagePrompt(context, result);
   const aspectRatio = detectImageAspectRatio(context);
