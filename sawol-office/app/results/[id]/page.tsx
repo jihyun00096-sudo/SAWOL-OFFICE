@@ -78,6 +78,24 @@ export default async function ResultDetailPage({
     typeof asset.model === "string" && asset.model.trim()
       ? asset.model
       : metadata.model ?? "-";
+  const sourcePrompt =
+    typeof asset.sourcePrompt === "string" && asset.sourcePrompt.trim()
+      ? asset.sourcePrompt
+      : null;
+  const positivePrompt =
+    typeof asset.prompt === "string" && asset.prompt.trim()
+      ? asset.prompt
+      : null;
+  const negativePrompt =
+    typeof asset.negativePrompt === "string" && asset.negativePrompt.trim()
+      ? asset.negativePrompt
+      : null;
+  const translationInfo =
+    typeof asset.translationModel === "string" && asset.translationModel.trim()
+      ? `${asset.translationProvider ?? "translator"} · ${asset.translationModel}`
+      : typeof asset.translationProvider === "string" && asset.translationProvider.trim()
+        ? asset.translationProvider
+        : null;
 
   return (
     <OfficeShell pendingApprovals={pendingApprovals ?? 0}>
@@ -183,6 +201,10 @@ export default async function ResultDetailPage({
               </dd>
             </div>
             <div>
+              <dt className="text-[#999EA7]">프롬프트 변환</dt>
+              <dd className="mt-1.5">{translationInfo ?? "-"}</dd>
+            </div>
+            <div>
               <dt className="text-[#999EA7]">실행 코드</dt>
               <dd className="mt-1.5">{metadata.run_code ?? "-"}</dd>
             </div>
@@ -208,6 +230,41 @@ export default async function ResultDetailPage({
               <p className="mt-3 text-[9px] text-[#8A909A]">
                 이미지 생성 AI · Cloudflare Workers AI · {imageModel} · 대표 승인본
               </p>
+            </div>
+          ) : null}
+
+          {result.result_type === "IMAGE" && (sourcePrompt || positivePrompt || negativePrompt) ? (
+            <div className="mb-5 grid gap-3 lg:grid-cols-2">
+              {sourcePrompt ? (
+                <div className="rounded-[14px] border border-[#E7E9EE] bg-[#FAFBFD] p-4">
+                  <p className="text-[10px] font-semibold text-[#4B5563]">대표 원문</p>
+                  <div className="mt-2 whitespace-pre-wrap break-words text-[10px] leading-6 text-[#5B6470]">
+                    {sourcePrompt}
+                  </div>
+                </div>
+              ) : null}
+
+              {positivePrompt ? (
+                <div className="rounded-[14px] border border-[#DCE4FF] bg-[#F8FAFF] p-4">
+                  <p className="text-[10px] font-semibold text-[#3157D5]">
+                    이미지 AI 전달 프롬프트
+                  </p>
+                  <div className="mt-2 whitespace-pre-wrap break-words text-[10px] leading-6 text-[#4B5563]">
+                    {positivePrompt}
+                  </div>
+                </div>
+              ) : null}
+
+              {negativePrompt ? (
+                <div className="rounded-[14px] border border-[#ECEEF2] bg-[#FCFCFD] p-4 lg:col-span-2">
+                  <p className="text-[10px] font-semibold text-[#666C76]">
+                    이미지 AI 억제 프롬프트
+                  </p>
+                  <div className="mt-2 whitespace-pre-wrap break-words text-[10px] leading-6 text-[#6B7280]">
+                    {negativePrompt}
+                  </div>
+                </div>
+              ) : null}
             </div>
           ) : null}
 

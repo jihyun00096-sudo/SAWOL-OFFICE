@@ -63,6 +63,24 @@ export default async function RunDetailPage({
     typeof asset.model === "string" && asset.model.trim()
       ? asset.model
       : run.model ?? "-";
+  const sourcePrompt =
+    typeof asset.sourcePrompt === "string" && asset.sourcePrompt.trim()
+      ? asset.sourcePrompt
+      : null;
+  const positivePrompt =
+    typeof asset.prompt === "string" && asset.prompt.trim()
+      ? asset.prompt
+      : null;
+  const negativePrompt =
+    typeof asset.negativePrompt === "string" && asset.negativePrompt.trim()
+      ? asset.negativePrompt
+      : null;
+  const translationInfo =
+    typeof asset.translationModel === "string" && asset.translationModel.trim()
+      ? `${asset.translationProvider ?? "translator"} · ${asset.translationModel}`
+      : typeof asset.translationProvider === "string" && asset.translationProvider.trim()
+        ? asset.translationProvider
+        : null;
 
   const provider = getAiProviderName();
   const providerLabel = getAiProviderDisplayName(provider);
@@ -135,9 +153,16 @@ export default async function RunDetailPage({
                 : `${providerLabel} · ${configuredModel}`}
           </p>
           {isImageResult ? (
-            <p className="mt-1 text-[9px] text-[#8B919C]">
-              무료 전용 이미지 생성 · 유료 fallback 없음
-            </p>
+            <>
+              <p className="mt-1 text-[9px] text-[#8B919C]">
+                무료 전용 이미지 생성 · 유료 fallback 없음
+              </p>
+              {translationInfo ? (
+                <p className="mt-1 text-[9px] text-[#8B919C]">
+                  프롬프트 변환 · {translationInfo}
+                </p>
+              ) : null}
+            </>
           ) : null}
         </div>
       </section>
@@ -222,6 +247,41 @@ export default async function RunDetailPage({
             </div>
           ) : null}
 
+          {isImageResult && (sourcePrompt || positivePrompt || negativePrompt) ? (
+            <div className="mt-5 grid gap-3 lg:grid-cols-2">
+              {sourcePrompt ? (
+                <div className="rounded-[14px] border border-[#E7E9EE] bg-[#FAFBFD] p-4">
+                  <p className="text-[10px] font-semibold text-[#4B5563]">대표 원문</p>
+                  <div className="mt-2 whitespace-pre-wrap break-words text-[10px] leading-6 text-[#5B6470]">
+                    {sourcePrompt}
+                  </div>
+                </div>
+              ) : null}
+
+              {positivePrompt ? (
+                <div className="rounded-[14px] border border-[#DCE4FF] bg-[#F8FAFF] p-4">
+                  <p className="text-[10px] font-semibold text-[#3157D5]">
+                    이미지 AI 전달 프롬프트
+                  </p>
+                  <div className="mt-2 whitespace-pre-wrap break-words text-[10px] leading-6 text-[#4B5563]">
+                    {positivePrompt}
+                  </div>
+                </div>
+              ) : null}
+
+              {negativePrompt ? (
+                <div className="rounded-[14px] border border-[#ECEEF2] bg-[#FCFCFD] p-4 lg:col-span-2">
+                  <p className="text-[10px] font-semibold text-[#666C76]">
+                    이미지 AI 억제 프롬프트
+                  </p>
+                  <div className="mt-2 whitespace-pre-wrap break-words text-[10px] leading-6 text-[#6B7280]">
+                    {negativePrompt}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
           <div className="mt-5 min-w-0 max-w-full whitespace-pre-wrap break-words [overflow-wrap:anywhere] overflow-hidden text-[12px] leading-7 text-[#444A54]">
             {run.result_body}
           </div>
@@ -262,6 +322,7 @@ export default async function RunDetailPage({
           {isImageResult ? (
             <div className="mt-6 border-t border-[#ECEEF2] pt-4 text-[9px] text-[#A0A5AE]">
               이미지 생성 · Cloudflare Workers AI · {imageModel} · FREE-ONLY
+              {translationInfo ? ` · 프롬프트 변환 ${translationInfo}` : ""}
             </div>
           ) : run.provider ? (
             <div className="mt-6 border-t border-[#ECEEF2] pt-4 text-[9px] text-[#A0A5AE]">

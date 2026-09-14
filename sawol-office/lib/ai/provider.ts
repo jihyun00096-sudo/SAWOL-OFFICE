@@ -1,4 +1,5 @@
 import type {
+  AiTaskAsset,
   AiTaskResult,
   SawolAiContext,
 } from "@/lib/ai/types";
@@ -30,6 +31,37 @@ function originalImageRequest(context: SawolAiContext) {
     description:
       description && description !== title ? description : "",
   };
+}
+
+function attachImagePromptSections(
+  result: AiTaskResult,
+  asset: AiTaskAsset,
+): AiTaskResult {
+  result.summary =
+    "대표 원문을 직접 기준으로 이미지 전용 영어 프롬프트로 변환한 뒤 무료 이미지 모델에서 생성했습니다. 최종 적합성은 대표 확인이 필요합니다.";
+
+  result.body = [
+    "생성된 이미지가 이번 업무의 최종 산출물입니다.",
+    "",
+    "[대표 원문]",
+    asset.sourcePrompt || "-",
+    "",
+    "[이미지 AI 전달 프롬프트]",
+    asset.prompt || "-",
+    asset.negativePrompt
+      ? "\n[이미지 AI 억제 프롬프트]\n" + asset.negativePrompt
+      : "",
+    asset.translationProvider || asset.translationModel
+      ? `\n[프롬프트 변환]\n${asset.translationProvider ?? "-"}${asset.translationModel ? ` · ${asset.translationModel}` : ""}`
+      : "",
+    "",
+    "[검수 상태]",
+    "자동 적합성 판정은 하지 않았습니다. 생성 이미지의 피사체·장소·색상·문구가 원문과 맞는지 대표 확인이 필요합니다.",
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  return result;
 }
 
 function buildDirectImageResult(
@@ -92,12 +124,13 @@ export async function executeAiTask({
 }) {
   // IMAGE PIPELINE:
   // 이미지 업무는 일반 텍스트 업무와 완전히 분리합니다.
-  // Gemini 프롬프트/회사 기억/직원 문맥을 거치지 않고 대표 원문만 Cloudflare로 전달합니다.
+  // 회사 기억/직원 문맥을 전달하지 않고 대표 원문만 이미지 전용 영어 프롬프트로 정리해 Cloudflare로 전달합니다.
   if (shouldGenerateImageForContext(context)) {
     const result = buildDirectImageResult(context);
     const asset = await generateCloudflareImageAsset({ context });
 
     result.asset = asset;
+    attachImagePromptSections(result, asset);
 
     return {
       provider: "cloudflare",
@@ -105,6 +138,10 @@ export async function executeAiTask({
       responseId: null,
       usage: {
         mode: "FREE_ONLY_IMAGE",
+        prompt_translation: {
+          provider: asset.translationProvider,
+          model: asset.translationModel,
+        },
         billing_fallback: false,
       },
       result,

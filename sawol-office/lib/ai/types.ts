@@ -9,7 +9,15 @@ export type AiTaskAsset = {
   url?: string | null;
   storagePath?: string | null;
   mimeType: string;
+  /** 실제 이미지 모델에 전달된 최종 positive prompt */
   prompt: string;
+  /** 실제 이미지 모델에 전달된 negative prompt */
+  negativePrompt?: string | null;
+  /** 대표가 입력한 원문 요청 */
+  sourcePrompt?: string | null;
+  /** 프롬프트 번역/정리 단계 정보 */
+  translationProvider?: string | null;
+  translationModel?: string | null;
   model: string;
   aspectRatio: string;
   imageSize: string;

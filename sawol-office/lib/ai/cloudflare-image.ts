@@ -1,5 +1,6 @@
 import type { AiTaskAsset, SawolAiContext } from "@/lib/ai/types";
 import { detectImageAspectRatio } from "@/lib/ai/image-policy";
+import { translateImagePrompt } from "@/lib/ai/image-prompt-translator";
 
 const FREE_IMAGE_MODEL = "@cf/bytedance/stable-diffusion-xl-lightning";
 
@@ -27,6 +28,12 @@ function explicitlyRequestsText(request: string) {
   );
 }
 
+function explicitlyForbidsText(request: string) {
+  return /(글자(는|를)?\s*넣지\s*마|텍스트(는|를)?\s*넣지\s*마|문구(는|를)?\s*넣지\s*마|글씨(는|를)?\s*넣지\s*마|문자(는|를)?\s*넣지\s*마|텍스트\s*없음|글자\s*없음|문자\s*없음|글씨\s*없음|로고\s*없음|no\s*text|without\s*text|text-free|no\s*letters)/i.test(
+    request,
+  );
+}
+
 function dimensionsFor(aspectRatio: string) {
   const value = aspectRatio.replace(/\s/g, "");
 
@@ -38,47 +45,82 @@ function dimensionsFor(aspectRatio: string) {
   return { width: 1024, height: 1024 };
 }
 
-function buildPositivePrompt(context: SawolAiContext) {
-  const request = originalRequestText(context);
-  const aspectRatio = detectImageAspectRatio(context);
-
-  // SDXL은 "그리지 말 것"을 긴 문장으로 반복하기보다
-  // 사용자가 원하는 피사체/장소/색감/스타일을 앞에 두는 편이 안정적입니다.
-  return [
-    request || "Create the requested image.",
-    "",
-    "Faithfully follow the user's requested subject, setting, colors, mood, and style.",
-    "The requested main subject must be clearly visible and visually dominant.",
+function buildPositivePrompt({
+  translatedPrompt,
+  aspectRatio,
+  wantsText,
+  forbidsText,
+}: {
+  translatedPrompt: string;
+  aspectRatio: string;
+  wantsText: boolean;
+  forbidsText: boolean;
+}) {
+  const lines = [
+    translatedPrompt || "Create the requested image.",
     `Composition: ${aspectRatio}.`,
-    "Clean, coherent, polished composition. Accurate scene matching.",
-  ].join("\n");
+    "Make the requested main subject clearly visible and visually dominant.",
+    "Match the requested setting, mood, and style without adding unrelated content.",
+  ];
+
+  if (forbidsText) {
+    lines.push("No text, no letters, no signage, no logo, no watermark.");
+  } else if (!wantsText) {
+    lines.push("Avoid adding extra text, labels, or signage.");
+  }
+
+  return lines.join("\n");
 }
 
-function buildNegativePrompt(context: SawolAiContext) {
-  const request = originalRequestText(context);
-  const wantsText = explicitlyRequestsText(request);
+function mergeNegativePrompts(...values: Array<string | null | undefined>) {
+  const tokens = values
+    .flatMap((value) => (value || "").split(","))
+    .map((token) => token.trim())
+    .filter(Boolean);
 
-  const negatives = [
+  const seen = new Set<string>();
+  const merged: string[] = [];
+
+  for (const token of tokens) {
+    const key = token.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    merged.push(token);
+  }
+
+  return merged.join(", ");
+}
+
+function buildNegativePrompt({
+  wantsText,
+  forbidsText,
+  translatedNegativePrompt,
+}: {
+  wantsText: boolean;
+  forbidsText: boolean;
+  translatedNegativePrompt: string;
+}) {
+  const base = [
     "wrong subject",
     "missing main subject",
     "unrelated scene",
     "unrelated person",
     "unrelated building",
-    "office interior",
     "corporate office",
+    "office interior",
     "meeting room",
     "company branding",
     "logo",
     "watermark",
-    "low quality",
-    "blurry",
     "distorted",
     "deformed",
     "duplicate subject",
+    "low quality",
+    "blurry",
   ];
 
-  if (!wantsText) {
-    negatives.push(
+  if (forbidsText || !wantsText) {
+    base.push(
       "text",
       "letters",
       "typography",
@@ -89,7 +131,7 @@ function buildNegativePrompt(context: SawolAiContext) {
     );
   }
 
-  return negatives.join(", ");
+  return mergeNegativePrompts(base.join(", "), translatedNegativePrompt);
 }
 
 type CloudflareEnvelope = {
@@ -155,7 +197,6 @@ function findBase64Image(value: unknown): string | null {
       return comma >= 0 ? trimmed.slice(comma + 1) : null;
     }
 
-    // 대략적인 base64 이미지 응답 대응
     if (trimmed.length > 1000 && /^[A-Za-z0-9+/=\s]+$/.test(trimmed)) {
       return trimmed.replace(/\s/g, "");
     }
@@ -195,12 +236,31 @@ export async function generateCloudflareImageAsset({
     );
   }
 
+  const sourcePrompt = originalRequestText(context);
+  const aspectRatio = detectImageAspectRatio(context);
+  const wantsText = explicitlyRequestsText(sourcePrompt);
+  const forbidsText = explicitlyForbidsText(sourcePrompt);
+  const translation = await translateImagePrompt({
+    sourcePrompt,
+    aspectRatio,
+    explicitlyRequestsText: wantsText,
+    explicitlyForbidsText: forbidsText,
+  });
+
   // FREE-ONLY:
   // SDXL-Lightning만 사용하며 다른 유료 이미지 모델로 fallback하지 않습니다.
   const model = FREE_IMAGE_MODEL;
-  const prompt = buildPositivePrompt(context);
-  const negativePrompt = buildNegativePrompt(context);
-  const aspectRatio = detectImageAspectRatio(context);
+  const prompt = buildPositivePrompt({
+    translatedPrompt: translation.prompt,
+    aspectRatio,
+    wantsText,
+    forbidsText,
+  });
+  const negativePrompt = buildNegativePrompt({
+    wantsText,
+    forbidsText,
+    translatedNegativePrompt: translation.negativePrompt,
+  });
   const { width, height } = dimensionsFor(aspectRatio);
 
   const endpoint =
@@ -240,7 +300,6 @@ export async function generateCloudflareImageAsset({
 
   const contentType = response.headers.get("content-type") || "";
 
-  // SDXL 계열은 환경에 따라 이미지 바이트 스트림을 직접 반환할 수 있습니다.
   if (contentType.startsWith("image/")) {
     const buffer = await response.arrayBuffer();
 
@@ -256,14 +315,17 @@ export async function generateCloudflareImageAsset({
       url: null,
       storagePath: null,
       mimeType: contentType.split(";")[0] || "image/jpeg",
+      sourcePrompt,
       prompt,
+      negativePrompt,
+      translationProvider: translation.translator,
+      translationModel: translation.translationModel,
       model,
       aspectRatio,
       imageSize: `${width}x${height}`,
     };
   }
 
-  // 일부 REST 응답은 JSON envelope 안에 base64 이미지를 담아 반환할 수 있어 함께 대응합니다.
   const payload = (await response.json().catch(() => null)) as
     | CloudflareEnvelope
     | null;
@@ -286,7 +348,11 @@ export async function generateCloudflareImageAsset({
     url: null,
     storagePath: null,
     mimeType: "image/jpeg",
+    sourcePrompt,
     prompt,
+    negativePrompt,
+    translationProvider: translation.translator,
+    translationModel: translation.translationModel,
     model,
     aspectRatio,
     imageSize: `${width}x${height}`,
