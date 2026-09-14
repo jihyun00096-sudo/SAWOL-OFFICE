@@ -6,7 +6,7 @@ import {
 import { runMockTask } from "@/lib/ai/mock";
 import { runOpenAiTask } from "@/lib/ai/openai";
 import { runGeminiTask } from "@/lib/ai/gemini";
-import { generateGeminiImageAsset } from "@/lib/ai/gemini-image";
+import { generateCloudflareImageAsset } from "@/lib/ai/cloudflare-image";
 import { shouldGenerateImageForContext } from "@/lib/ai/image-policy";
 
 export type AiProviderName = "mock" | "openai" | "gemini";
@@ -57,8 +57,10 @@ export async function executeAiTask({
       useWebSearch,
     });
 
+    // 텍스트 판단/제작안은 기존 Gemini 무료 경로를 유지합니다.
+    // 실제 이미지가 필요한 업무만 Cloudflare Workers AI 무료 모델을 사용합니다.
     if (shouldGenerateImageForContext(context)) {
-      response.result.asset = await generateGeminiImageAsset({
+      response.result.asset = await generateCloudflareImageAsset({
         context,
         result: response.result,
       });
