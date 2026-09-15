@@ -30,6 +30,7 @@ const IMAGE_SIGNALS = [
   "프로필사진",
   "사진 제작",
   "사진 만들어",
+  "사진 만들어줘",
   "사진 1장",
   "사진 한 장",
   "그림",
@@ -44,6 +45,7 @@ const IMAGE_SIGNALS = [
   "상세페이지 이미지",
   "image",
   "photo",
+  "photograph",
   "illustration",
   "thumbnail",
   "poster",
@@ -51,9 +53,64 @@ const IMAGE_SIGNALS = [
   "render",
 ];
 
+/**
+ * 사용자가 "사진"이나 "이미지"라는 단어를 직접 쓰지 않아도
+ * "핸드폰 카메라로 찍은 것처럼 만들어줘"처럼 자연스럽게 지시할 수 있습니다.
+ *
+ * generic한 "만들어줘" 하나만으로 이미지 업무로 오인하지 않고,
+ * 촬영/카메라 계열 표현 + 생성 의도가 함께 있을 때만 이미지로 판정합니다.
+ */
+function hasCameraPhotoIntent(text: string) {
+  const cameraSignals = [
+    "카메라",
+    "핸드폰 카메라",
+    "휴대폰 카메라",
+    "스마트폰 카메라",
+    "촬영",
+    "스튜디오 촬영",
+    "찍은 것처럼",
+    "찍은거처럼",
+    "찍은 듯",
+    "찍은듯",
+    "찍어줘",
+    "찍어 줘",
+    "스냅샷",
+    "셀카",
+    "실사",
+    "포토",
+    "camera",
+    "shot on",
+    "snapshot",
+    "studio shot",
+  ];
+
+  const creationSignals = [
+    "만들",
+    "생성",
+    "제작",
+    "그려",
+    "그림",
+    "이미지",
+    "사진",
+    "찍어",
+    "create",
+    "generate",
+    "make",
+  ];
+
+  return (
+    cameraSignals.some((signal) => text.includes(signal)) &&
+    creationSignals.some((signal) => text.includes(signal))
+  );
+}
+
 export function isImageRequest(context: SawolAiContext) {
   const text = contextText(context);
-  return IMAGE_SIGNALS.some((signal) => text.includes(signal));
+
+  return (
+    IMAGE_SIGNALS.some((signal) => text.includes(signal)) ||
+    hasCameraPhotoIntent(text)
+  );
 }
 
 export function shouldGenerateImageForContext(context: SawolAiContext) {
@@ -63,16 +120,6 @@ export function shouldGenerateImageForContext(context: SawolAiContext) {
   const workflowId = textOf(task.workflow_id);
   const stepKey = textOf(task.workflow_step_key).toLowerCase();
   const parentTaskId = textOf(task.parent_task_id);
-
-  /**
-   * STEP23-4.1.1
-   *
-   * 대표가 직접 지시한 메인 업무(parent_task_id 없음)가 이미지 요청이면
-   * workflow_id가 있더라도 이미지 파이프라인에 진입해야 합니다.
-   *
-   * 기존 로직은 workflow_id가 존재하면 final 단계에서만 true가 되어
-   * 대표의 메인 이미지 업무가 Gemini 텍스트 경로로 빠지는 문제가 있었습니다.
-   */
 
   // 대표가 직접 등록한 메인 이미지 업무:
   // workflow가 있어도 바로 이미지 파이프라인 허용
