@@ -58,6 +58,29 @@ type FeedbackRow = {
   created_at: string;
 };
 
+type WorkflowTaskRow = {
+  id: string;
+  parent_task_id: string | null;
+  workflow_id: string | null;
+  workflow_step_no: number | null;
+  workflow_step_key: string | null;
+  task_code: string;
+  title: string;
+  status: string;
+  assigned_employee_id: string | null;
+  updated_at: string;
+};
+
+type HandoffRow = {
+  id: string;
+  from_task_id: string;
+  to_task_id: string;
+  title: string;
+  summary: string | null;
+  status: string;
+  created_at: string;
+};
+
 const taskStatusLabel: Record<string, string> = {
   WAITING: "대기",
   WAITING_FOR_DATA: "자료 대기",
@@ -186,6 +209,8 @@ export default async function DashboardPage() {
     { data: jobs },
     { data: feedbackRows },
     { data: recentTasks },
+    { data: workflowTasks },
+    { data: handoffRows },
   ] = await Promise.all([
     supabase.from("v_ceo_dashboard_summary").select("*").maybeSingle(),
     supabase
@@ -220,6 +245,19 @@ export default async function DashboardPage() {
       )
       .order("updated_at", { ascending: false })
       .limit(60),
+    supabase
+      .from("tasks")
+      .select(
+        "id, parent_task_id, workflow_id, workflow_step_no, workflow_step_key, task_code, title, status, assigned_employee_id, updated_at",
+      )
+      .not("parent_task_id", "is", null)
+      .order("updated_at", { ascending: false })
+      .limit(80),
+    supabase
+      .from("task_handoffs")
+      .select("id, from_task_id, to_task_id, title, summary, status, created_at")
+      .order("created_at", { ascending: false })
+      .limit(20),
   ]);
 
   const summary = (summaryRow ?? {}) as Partial<DashboardSummary>;
@@ -227,8 +265,12 @@ export default async function DashboardPage() {
   const taskRows = (recentTasks ?? []) as TaskRow[];
   const jobRows = (jobs ?? []) as JobRow[];
   const feedback = (feedbackRows ?? []) as FeedbackRow[];
+  const workflowTaskRows = (workflowTasks ?? []) as WorkflowTaskRow[];
+  const handoffs = (handoffRows ?? []) as HandoffRow[];
 
   const taskById = new Map(taskRows.map((task) => [task.id, task]));
+  const workflowTaskById = new Map(workflowTaskRows.map((task) => [task.id, task]));
+  const employeeById = new Map(employeeRows.map((employee) => [employee.id, employee]));
   const feedbackByTask = new Map(feedback.map((item) => [item.root_task_id, item]));
 
   const pendingApprovals = n(summary.pending_approvals);
@@ -242,9 +284,60 @@ export default async function DashboardPage() {
 
   const attentionCount = pendingApprovals + pausedJobs.length + failedJobs.length;
 
-  const workingEmployees = employeeRows.filter((employee) =>
-    ["WORKING", "REVIEWING", "APPROVAL_WAIT", "BLOCKED"].includes(employee.status),
+  const activeWorkflowStatuses = new Set([
+    "WAITING",
+    "WAITING_FOR_DATA",
+    "IN_PROGRESS",
+    "COLLABORATING",
+    "IN_REVIEW",
+    "REVIEW",
+    "PENDING_APPROVAL",
+    "APPROVAL_WAIT",
+    "REVISION_REQUESTED",
+    "ON_HOLD",
+    "ERROR",
+  ]);
+
+  const activeWorkflowTasks = workflowTaskRows.filter((task) =>
+    activeWorkflowStatuses.has(task.status),
   );
+
+  const liveEmployeeActivity = activeWorkflowTasks
+    .filter((task) => Boolean(task.assigned_employee_id))
+    .map((task) => {
+      const employee = task.assigned_employee_id
+        ? employeeById.get(task.assigned_employee_id)
+        : null;
+
+      return employee ? { employee, task } : null;
+    })
+    .filter(Boolean) as Array<{ employee: EmployeeRow; task: WorkflowTaskRow }>;
+
+  const uniqueLiveEmployees = Array.from(
+    new Map(liveEmployeeActivity.map((item) => [item.employee.id, item])).values(),
+  ).slice(0, 7);
+
+  const fallbackWorkingEmployees = employeeRows
+    .filter((employee) =>
+      ["WORKING", "REVIEWING", "APPROVAL_WAIT", "BLOCKED"].includes(employee.status),
+    )
+    .slice(0, 7);
+
+  const recentCollaboration = handoffs
+    .map((handoff) => {
+      const fromTask = workflowTaskById.get(handoff.from_task_id);
+      const toTask = workflowTaskById.get(handoff.to_task_id);
+      const fromEmployee = fromTask?.assigned_employee_id
+        ? employeeById.get(fromTask.assigned_employee_id)
+        : null;
+      const toEmployee = toTask?.assigned_employee_id
+        ? employeeById.get(toTask.assigned_employee_id)
+        : null;
+
+      return { handoff, fromTask, toTask, fromEmployee, toEmployee };
+    })
+    .filter((item) => Boolean(item.fromTask || item.toTask) && item.handoff.status === "AVAILABLE")
+    .slice(0, 5);
 
   const recentRootTasks = taskRows.filter((task) => !task.parent_task_id).slice(0, 8);
 
@@ -514,55 +607,130 @@ export default async function DashboardPage() {
         <section className="rounded-[20px] border border-[#E7E9EE] bg-white p-4 sm:p-5 lg:p-6">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <h2 className="text-[14px] font-semibold">AI 직원 현황</h2>
-              <p className="mt-1 text-[10px] text-[#9298A2]">현재 실제로 일하고 있는 직원 중심</p>
+              <h2 className="text-[14px] font-semibold">AI 직원 · 협업 현황</h2>
+              <p className="mt-1 text-[10px] text-[#9298A2]">실제 업무 배정과 인수인계 기준</p>
             </div>
             <Link href="/employees" className="text-[10px] font-medium text-[#3157D5]">
               직원 전체 →
             </Link>
           </div>
 
-          <div className="mt-4 space-y-2">
-            {(workingEmployees.length ? workingEmployees : employeeRows.slice(0, 5)).slice(0, 6).map((employee) => {
-              const currentTask = employee.current_task_id ? taskById.get(employee.current_task_id) : null;
-              const active = ["WORKING", "REVIEWING", "APPROVAL_WAIT"].includes(employee.status);
+          <div className="mt-4">
+            <div className="flex items-center justify-between">
+              <p className="text-[10px] font-semibold text-[#5A616D]">지금 실제로 일하는 직원</p>
+              <span className="rounded-full bg-[#EEF2FF] px-2 py-1 text-[8px] font-semibold text-[#3157D5]">
+                {uniqueLiveEmployees.length || fallbackWorkingEmployees.length}명 활동
+              </span>
+            </div>
 
-              return (
-                <Link
-                  key={employee.id}
-                  href={`/employees/${employee.id}`}
-                  className="flex items-center gap-3 rounded-[13px] border border-[#EEF0F3] px-3 py-3 transition hover:bg-[#FAFBFC]"
-                >
-                  <div
-                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
-                      active
-                        ? "bg-[#EEF2FF] text-[#3157D5]"
-                        : employee.status === "BLOCKED"
-                          ? "bg-[#FFF0F0] text-[#B34A4A]"
-                          : "bg-[#F2F3F5] text-[#7C828C]"
-                    }`}
+            <div className="mt-2 space-y-2">
+              {uniqueLiveEmployees.length ? (
+                uniqueLiveEmployees.map(({ employee, task }) => (
+                  <Link
+                    key={`${employee.id}-${task.id}`}
+                    href={`/tasks/${task.id}`}
+                    className="flex items-center gap-3 rounded-[13px] border border-[#E8ECF8] bg-[#FBFCFF] px-3 py-3 transition hover:border-[#C9D5FA]"
                   >
-                    {employee.name.slice(0, 1)}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <p className="truncate text-[10px] font-semibold">{employee.name}</p>
-                      <span className="text-[8px] text-[#A0A5AE]">{employeeStatusLabel[employee.status] ?? employee.status}</span>
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#EEF2FF] text-[10px] font-bold text-[#3157D5]">
+                      {employee.name.slice(0, 1)}
                     </div>
-                    <p className="mt-1 truncate text-[9px] text-[#8C929D]">
-                      {currentTask?.title || employee.position || "대기 중"}
-                    </p>
-                  </div>
-                  <span className={`h-2 w-2 shrink-0 rounded-full ${active ? "bg-[#3157D5]" : employee.status === "BLOCKED" ? "bg-[#C85C5C]" : "bg-[#CDD1D7]"}`} />
-                </Link>
-              );
-            })}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <p className="truncate text-[10px] font-semibold">{employee.name}</p>
+                        <span className="rounded-full bg-white px-1.5 py-0.5 text-[7px] font-medium text-[#3157D5]">
+                          {taskStatusLabel[task.status] ?? task.status}
+                        </span>
+                        {task.workflow_step_no ? (
+                          <span className="text-[7px] text-[#A1A6AF]">STEP {task.workflow_step_no}</span>
+                        ) : null}
+                      </div>
+                      <p className="mt-1 truncate text-[9px] font-medium text-[#626A77]">{task.title}</p>
+                      <p className="mt-1 truncate text-[8px] text-[#A0A5AE]">
+                        {employee.position || "AI 직원"} · {task.task_code}
+                      </p>
+                    </div>
+                    <span className="h-2 w-2 shrink-0 rounded-full bg-[#3157D5]" />
+                  </Link>
+                ))
+              ) : fallbackWorkingEmployees.length ? (
+                fallbackWorkingEmployees.map((employee) => (
+                  <Link
+                    key={employee.id}
+                    href={`/employees/${employee.id}`}
+                    className="flex items-center gap-3 rounded-[13px] border border-[#EEF0F3] px-3 py-3 transition hover:bg-[#FAFBFC]"
+                  >
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#F2F3F5] text-[10px] font-bold text-[#7C828C]">
+                      {employee.name.slice(0, 1)}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="truncate text-[10px] font-semibold">{employee.name}</p>
+                        <span className="text-[8px] text-[#A0A5AE]">
+                          {employeeStatusLabel[employee.status] ?? employee.status}
+                        </span>
+                      </div>
+                      <p className="mt-1 truncate text-[9px] text-[#8C929D]">
+                        {employee.position || "업무 상태 동기화 중"}
+                      </p>
+                    </div>
+                    <span className="h-2 w-2 shrink-0 rounded-full bg-[#C8CDD5]" />
+                  </Link>
+                ))
+              ) : (
+                <EmptyMini text="현재 실제 업무에 배정되어 작업 중인 AI 직원이 없습니다." />
+              )}
+            </div>
           </div>
 
-          <div className="mt-4 grid grid-cols-3 gap-2 rounded-[14px] bg-[#F7F8FA] p-3">
+          <div className="mt-5 border-t border-[#EFF1F4] pt-4">
+            <div className="flex items-center justify-between">
+              <p className="text-[10px] font-semibold text-[#5A616D]">최근 협업 · 인수인계</p>
+              <Link href="/tasks" className="text-[8px] font-medium text-[#3157D5]">
+                업무 흐름 보기 →
+              </Link>
+            </div>
+
+            <div className="mt-2 space-y-2">
+              {recentCollaboration.length ? (
+                recentCollaboration.map((item) => (
+                  <Link
+                    key={item.handoff.id}
+                    href={item.toTask ? `/tasks/${item.toTask.id}` : "/tasks"}
+                    className="block rounded-[12px] bg-[#F7F8FA] px-3 py-2.5 transition hover:bg-[#F3F6FF]"
+                  >
+                    <div className="flex items-center gap-2 text-[9px]">
+                      <span className="font-semibold text-[#555D6A]">
+                        {item.fromEmployee?.name || "이전 담당"}
+                      </span>
+                      <span className="text-[#B0B4BC]">→</span>
+                      <span className="font-semibold text-[#3157D5]">
+                        {item.toEmployee?.name || "다음 담당"}
+                      </span>
+                      <span className="ml-auto text-[7px] text-[#A2A7B0]">
+                        {formatTime(item.handoff.created_at)}
+                      </span>
+                    </div>
+                    <p className="mt-1 truncate text-[8px] text-[#7F8691]">
+                      {truncate(item.handoff.summary || item.handoff.title || item.toTask?.title || "업무 인수인계", 120)}
+                    </p>
+                  </Link>
+                ))
+              ) : (
+                <p className="rounded-[12px] bg-[#F8F9FB] px-3 py-3 text-[9px] text-[#999FA8]">
+                  아직 기록된 협업 인수인계가 없습니다.
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="mt-4 grid grid-cols-4 gap-2 rounded-[14px] bg-[#F7F8FA] p-3">
             <div>
-              <p className="text-[8px] text-[#989DA6]">직원</p>
+              <p className="text-[8px] text-[#989DA6]">전체 직원</p>
               <p className="mt-1 text-[14px] font-bold">{employeeRows.length}</p>
+            </div>
+            <div>
+              <p className="text-[8px] text-[#989DA6]">실제 활동</p>
+              <p className="mt-1 text-[14px] font-bold">{uniqueLiveEmployees.length}</p>
             </div>
             <div>
               <p className="text-[8px] text-[#989DA6]">조직 · 팀</p>
