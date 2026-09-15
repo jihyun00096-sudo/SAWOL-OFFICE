@@ -448,8 +448,9 @@ export async function runAutopilotStep(
       .eq("id", root.id)
       .maybeSingle();
 
-    // 협업 최종 이미지가 생성된 경우, DB 트리거가 만든 root 최종 RUN에도
-    // 이미지 metadata를 복사해 승인/결과함/Discord가 동일한 이미지를 사용하게 합니다.
+    // 협업 final 단계에서 생성된 실제 산출물을 root 최종 RUN에도 복사합니다.
+    // 대표 승인 화면/결과함/Discord는 root RUN을 기준으로 보기 때문에
+    // 여기서 asset + artifacts + artifact_plan을 모두 동기화해야 합니다.
     if (result.asset?.url || (result.artifacts?.length ?? 0) > 0) {
       const { data: rootRuns } = await supabase
         .from("task_runs")
@@ -463,18 +464,32 @@ export async function runAutopilotStep(
       );
 
       if (workflowFinalRun?.id) {
+        const previousMetadata =
+          workflowFinalRun.metadata &&
+          typeof workflowFinalRun.metadata === "object"
+            ? workflowFinalRun.metadata
+            : {};
+
+        const previousStep20 =
+          (previousMetadata as any).step20 &&
+          typeof (previousMetadata as any).step20 === "object"
+            ? (previousMetadata as any).step20
+            : {};
+
         await supabase
           .from("task_runs")
           .update({
             provider,
             model,
             metadata: {
-              ...(workflowFinalRun.metadata ?? {}),
+              ...previousMetadata,
               step20: {
+                ...previousStep20,
                 confidence: result.confidence,
                 needs_human_review: result.needs_human_review,
                 sources: result.sources,
                 asset: result.asset,
+                artifacts: result.artifacts ?? [],
                 artifact_plan: result.artifact_plan ?? null,
               },
             },
