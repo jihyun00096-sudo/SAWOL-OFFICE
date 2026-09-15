@@ -4,6 +4,8 @@ import { executeAiTask } from "@/lib/ai/provider";
 import type { SawolAiContext } from "@/lib/ai/types";
 import { shouldUseWebResearch } from "@/lib/ai/research-policy";
 import { persistGeneratedImageAsset } from "@/lib/ai/image-storage";
+import { generateRequestedFileArtifacts } from "@/lib/artifacts/generate";
+import { persistGeneratedArtifacts } from "@/lib/artifacts/storage";
 
 export const runtime = "nodejs";
 export const maxDuration = 180;
@@ -159,6 +161,22 @@ export async function POST(
 
     ai.result.asset = persistedAsset;
 
+    const generatedArtifacts = await generateRequestedFileArtifacts({
+      context,
+      result: ai.result,
+      plan: ai.artifactPlan,
+    });
+
+    const persistedArtifacts = generatedArtifacts.length
+      ? await persistGeneratedArtifacts(supabase, {
+          taskId: task.id,
+          runId: id,
+          artifacts: generatedArtifacts,
+        })
+      : [];
+
+    ai.result.artifacts = persistedArtifacts;
+
     const previousMetadata =
       run.metadata &&
       typeof run.metadata === "object" &&
@@ -189,6 +207,7 @@ export async function POST(
             sources: ai.result.sources,
             asset: persistedAsset,
             artifact_plan: ai.artifactPlan,
+            artifacts: persistedArtifacts,
           },
         },
         updated_at: finishedAt,

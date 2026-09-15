@@ -56,6 +56,15 @@ export default async function RunDetailPage({
   const step20 = metadataObject(metadata.step20);
   const sources = Array.isArray(step20.sources) ? step20.sources : [];
   const asset = metadataObject(step20.asset);
+  const artifacts = Array.isArray(step20.artifacts)
+    ? step20.artifacts.filter(
+        (artifact: any) =>
+          artifact &&
+          typeof artifact === "object" &&
+          typeof artifact.url === "string" &&
+          artifact.url.trim(),
+      )
+    : [];
   const imageUrl =
     typeof asset.url === "string" && asset.url.trim() ? asset.url : null;
   const isImageResult = Boolean(imageUrl);
@@ -228,6 +237,49 @@ export default async function RunDetailPage({
             <p className="mt-4 rounded-[12px] bg-[#F7F8FA] px-4 py-3 text-[11px] leading-5 text-[#666C76]">
               {run.result_summary}
             </p>
+          ) : null}
+
+          {artifacts.length ? (
+            <div className="mt-5 rounded-[16px] border border-[#DCE4FF] bg-[#FBFCFF] p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <p className="text-[10px] font-semibold text-[#3157D5]">
+                    생성된 파일
+                  </p>
+                  <p className="mt-1 text-[9px] text-[#858B96]">
+                    요청한 실제 산출물 파일입니다.
+                  </p>
+                </div>
+                <span className="rounded-full bg-white px-2 py-1 text-[8px] font-semibold text-[#3157D5]">
+                  {artifacts.length}개
+                </span>
+              </div>
+
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                {artifacts.map((artifact: any, index: number) => (
+                  <a
+                    key={`${artifact.id ?? artifact.url}-${index}`}
+                    href={artifact.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    download={artifact.fileName || undefined}
+                    className="flex items-center justify-between gap-3 rounded-[12px] border border-[#E2E7F6] bg-white px-3 py-3 transition hover:border-[#BFCDF4]"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-[10px] font-semibold text-[#454B55]">
+                        {artifact.label || artifact.fileName || "산출물 파일"}
+                      </p>
+                      <p className="mt-1 truncate text-[8px] uppercase text-[#9298A2]">
+                        {artifact.fileName || `.${artifact.format ?? "file"}`}
+                      </p>
+                    </div>
+                    <span className="shrink-0 text-[9px] font-semibold text-[#3157D5]">
+                      열기 ↗
+                    </span>
+                  </a>
+                ))}
+              </div>
+            </div>
           ) : null}
 
           {imageUrl ? (

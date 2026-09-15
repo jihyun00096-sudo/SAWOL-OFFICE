@@ -4,6 +4,8 @@ import type { SawolAiContext } from "@/lib/ai/types";
 import { shouldUseWebResearch } from "@/lib/ai/research-policy";
 import { ResearchInsufficientError } from "@/lib/ai/free-web-research";
 import { persistGeneratedImageAsset } from "@/lib/ai/image-storage";
+import { generateRequestedFileArtifacts } from "@/lib/artifacts/generate";
+import { persistGeneratedArtifacts } from "@/lib/artifacts/storage";
 
 export type AutopilotStepResult = {
   ok: true;
@@ -171,6 +173,22 @@ async function executeTask(supabase: any, task: any) {
 
     ai.result.asset = persistedAsset;
 
+    const generatedArtifacts = await generateRequestedFileArtifacts({
+      context,
+      result: ai.result,
+      plan: ai.artifactPlan,
+    });
+
+    const persistedArtifacts = generatedArtifacts.length
+      ? await persistGeneratedArtifacts(supabase, {
+          taskId: task.id,
+          runId: run.id,
+          artifacts: generatedArtifacts,
+        })
+      : [];
+
+    ai.result.artifacts = persistedArtifacts;
+
     const { error: saveError } = await supabase
       .from("task_runs")
       .update({
@@ -198,6 +216,7 @@ async function executeTask(supabase: any, task: any) {
             sources: ai.result.sources,
             asset: persistedAsset,
             artifact_plan: ai.artifactPlan,
+            artifacts: persistedArtifacts,
           },
         },
         updated_at: now,
@@ -431,7 +450,7 @@ export async function runAutopilotStep(
 
     // 협업 최종 이미지가 생성된 경우, DB 트리거가 만든 root 최종 RUN에도
     // 이미지 metadata를 복사해 승인/결과함/Discord가 동일한 이미지를 사용하게 합니다.
-    if (result.asset?.url) {
+    if (result.asset?.url || (result.artifacts?.length ?? 0) > 0) {
       const { data: rootRuns } = await supabase
         .from("task_runs")
         .select("id,metadata")

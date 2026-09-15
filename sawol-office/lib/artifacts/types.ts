@@ -65,5 +65,7 @@ export type GeneratedArtifact = {
   storagePath?: string | null;
   fileName?: string | null;
   sizeBytes?: number | null;
+  /** Storage 업로드 전 서버 메모리에서만 사용하는 임시 데이터 */
+  dataBase64?: string | null;
   metadata?: Record<string, unknown> | null;
 };
