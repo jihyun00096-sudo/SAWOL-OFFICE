@@ -4,6 +4,8 @@ type DiscordGuildChannel = {
   type: number;
 };
 
+type DiscordComponent = Record<string, unknown>;
+
 const TEXT_CHANNEL = 0;
 
 async function discordFetch(path: string, init?: RequestInit) {
@@ -64,7 +66,10 @@ async function findChannelId(name: string) {
 export async function sendDiscordChannelMessage(
   channelName: string,
   content: string,
-  options?: { imageUrl?: string | null },
+  options?: {
+    imageUrl?: string | null;
+    components?: DiscordComponent[];
+  },
 ) {
   const channelId = await findChannelId(channelName);
 
@@ -85,11 +90,36 @@ export async function sendDiscordChannelMessage(
             },
           ]
         : undefined,
+      components: options?.components?.length
+        ? options.components
+        : undefined,
       allowed_mentions: {
         parse: [],
       },
     }),
   });
+}
+
+export function approvalButtons(taskId: string) {
+  return [
+    {
+      type: 1,
+      components: [
+        {
+          type: 2,
+          style: 3,
+          label: "승인",
+          custom_id: `sawol:approve:${taskId}`,
+        },
+        {
+          type: 2,
+          style: 4,
+          label: "반려",
+          custom_id: `sawol:reject:${taskId}`,
+        },
+      ],
+    },
+  ];
 }
 
 export function taskUrl(taskId: string) {

@@ -1,4 +1,5 @@
 import {
+  approvalButtons,
   approvalsUrl,
   sendDiscordChannelMessage,
   taskUrl,
@@ -206,9 +207,14 @@ export async function notifyDiscordForJob(
           ? "대표 반려 사유를 반영한 재작업과 내부 검수가 완료되었습니다."
           : "AI 직원 협업과 내부 검수가 완료되었습니다.",
         "",
+        "아래 버튼으로 Discord에서 바로 승인 또는 반려할 수 있습니다.",
         `승인함: ${approvalsUrl()}`,
         `업무 상세: ${detailUrl}`,
       ].join("\n"),
+      {
+        imageUrl,
+        components: approvalButtons(task.id),
+      },
     );
 
     await sendDiscordChannelMessage(

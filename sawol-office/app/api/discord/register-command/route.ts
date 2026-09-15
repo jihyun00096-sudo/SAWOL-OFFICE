@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { registerDiscordTaskCommand } from "@/lib/discord/register-command";
+import { registerDiscordCommands } from "@/lib/discord/register-command";
 
 export const runtime = "nodejs";
 
@@ -34,16 +34,16 @@ function isWorkerAuthorized(request: Request) {
 
 async function runRegistration() {
   try {
-    const command = await registerDiscordTaskCommand();
+    const commands = await registerDiscordCommands();
 
     return NextResponse.json({
       ok: true,
-      message: "Discord /업무 명령 등록 완료",
-      command: {
+      message: "Discord /업무 /승인 /반려 명령 등록 완료",
+      commands: commands.map((command: any) => ({
         id: command.id,
         name: command.name,
         description: command.description,
-      },
+      })),
     });
   } catch (error) {
     return NextResponse.json(
@@ -59,8 +59,7 @@ async function runRegistration() {
   }
 }
 
-// 터미널 없이 브라우저에서 등록:
-// sawol-office.vercel.app 에 로그인한 대표 관리자만 허용
+// 대표가 SAWOL OFFICE에 로그인한 상태에서 브라우저로 열면 등록됩니다.
 export async function GET() {
   if (!(await isLoggedInAdmin())) {
     return NextResponse.json(
@@ -76,7 +75,6 @@ export async function GET() {
   return runRegistration();
 }
 
-// 기존 worker secret 방식도 유지
 export async function POST(request: Request) {
   if (!isWorkerAuthorized(request)) {
     return NextResponse.json(
