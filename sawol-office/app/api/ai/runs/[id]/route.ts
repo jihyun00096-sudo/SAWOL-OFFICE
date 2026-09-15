@@ -188,6 +188,7 @@ export async function POST(
             needs_human_review: ai.result.needs_human_review,
             sources: ai.result.sources,
             asset: persistedAsset,
+            artifact_plan: ai.artifactPlan,
           },
         },
         updated_at: finishedAt,

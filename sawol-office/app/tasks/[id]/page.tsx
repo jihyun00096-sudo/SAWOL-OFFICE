@@ -18,6 +18,7 @@ import { buildEmployeeWorkloads, rankEmployeesForTask } from "@/lib/sawol/assign
 import { labelOf, priorityLabel, taskStatusLabel } from "@/lib/sawol/labels";
 import { executionStatusLabel } from "@/lib/sawol/execution";
 import { requireSawolAdmin } from "@/lib/auth/require-sawol-admin";
+import { planArtifactsFromText } from "@/lib/artifacts/router";
 
 export const dynamic = "force-dynamic";
 
@@ -90,6 +91,22 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ id:
     .filter((dep: any) => dep.depends_on?.status !== "COMPLETED")
     .map((dep: any) => ({ task_code: dep.depends_on?.task_code, title: dep.depends_on?.title ?? "선행 업무" }));
 
+  const artifactPlan = planArtifactsFromText(
+    [task.title, task.description ?? ""].filter(Boolean).join("\n"),
+  );
+
+  const artifactKindLabel: Record<string, string> = {
+    TEXT: "텍스트",
+    SPREADSHEET: "스프레드시트",
+    DOCUMENT: "문서",
+    PDF: "PDF",
+    IMAGE: "이미지",
+    PRESENTATION: "프레젠테이션",
+    CODE: "코드",
+    DATA: "데이터",
+    ARCHIVE: "압축파일",
+  };
+
   return (
     <OfficeShell pendingApprovals={pendingApprovals ?? 0}>
       <PageHeader
@@ -111,6 +128,42 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ id:
         <div className="rounded-[16px] border border-[#E7E9EE] bg-white p-4"><p className="text-[10px] text-[#9297A1]">우선순위</p><div className="mt-2"><StatusBadge value={task.priority} label={labelOf(priorityLabel, task.priority)} /></div></div>
         <div className="rounded-[16px] border border-[#E7E9EE] bg-white p-4"><p className="text-[10px] text-[#9297A1]">업무 유형</p><p className="mt-2 break-words text-[12px] font-medium">{taskTypeLabel[task.task_type] ?? task.task_type}</p></div>
       </section>
+
+      {!task.parent_task_id ? (
+        <section className="mt-3 rounded-[16px] border border-[#DCE4FF] bg-[#FBFCFF] p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-[10px] font-semibold text-[#3157D5]">예상 산출물</p>
+              <p className="mt-1 text-[9px] leading-5 text-[#7D8490]">
+                대표 지시에서 필요한 최종 파일 형식을 먼저 분리합니다.
+                {artifactPlan.isMultiArtifact
+                  ? " 여러 산출물이 감지되어 각각 별도 제작 대상으로 처리됩니다."
+                  : ""}
+              </p>
+            </div>
+            <span className="rounded-full bg-white px-2 py-1 text-[8px] font-semibold text-[#3157D5]">
+              STEP25 · {artifactPlan.items.length}개
+            </span>
+          </div>
+
+          <div className="mt-3 flex flex-wrap gap-2">
+            {artifactPlan.items.map((artifact) => (
+              <div
+                key={artifact.id}
+                className="rounded-[10px] border border-[#E0E6FA] bg-white px-3 py-2"
+                title={artifact.reason}
+              >
+                <p className="text-[9px] font-semibold text-[#454B55]">
+                  {artifactKindLabel[artifact.kind] ?? artifact.kind}
+                </p>
+                <p className="mt-0.5 text-[8px] uppercase text-[#9298A2]">
+                  .{artifact.format}
+                </p>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       {!task.parent_task_id ? (
         <div className="mt-5 space-y-3">

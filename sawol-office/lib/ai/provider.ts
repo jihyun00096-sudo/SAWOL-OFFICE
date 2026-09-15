@@ -12,6 +12,7 @@ import { runOpenAiTask } from "@/lib/ai/openai";
 import { runGeminiTask } from "@/lib/ai/gemini";
 import { generateCloudflareImageAsset } from "@/lib/ai/cloudflare-image";
 import { shouldGenerateImageForContext } from "@/lib/ai/image-policy";
+import { planArtifactsForContext } from "@/lib/artifacts/router";
 
 export type AiProviderName = "mock" | "openai" | "gemini";
 
@@ -122,14 +123,22 @@ export async function executeAiTask({
   context: SawolAiContext;
   useWebSearch: boolean;
 }) {
+  const artifactPlan = planArtifactsForContext(context);
+  const imageOnly =
+    artifactPlan.items.length === 1 &&
+    artifactPlan.items[0]?.kind === "IMAGE";
+
   // IMAGE PIPELINE:
+  // STEP25부터 이미지가 포함됐다는 이유만으로 전체 업무를 이미지 업무로 가로채지 않습니다.
+  // 이미지 하나만 요청한 업무일 때만 기존 이미지 전용 파이프라인을 사용합니다.
   // 이미지 업무는 일반 텍스트 업무와 완전히 분리합니다.
   // 회사 기억/직원 문맥을 전달하지 않고 대표 원문만 이미지 전용 영어 프롬프트로 정리해 Cloudflare로 전달합니다.
-  if (shouldGenerateImageForContext(context)) {
+  if (imageOnly && shouldGenerateImageForContext(context)) {
     const result = buildDirectImageResult(context);
     const asset = await generateCloudflareImageAsset({ context });
 
     result.asset = asset;
+    result.artifact_plan = artifactPlan;
     attachImagePromptSections(result, asset);
 
     return {
@@ -147,6 +156,7 @@ export async function executeAiTask({
       result,
       usedWebSearch: false,
       requestedWebSearch: false,
+      artifactPlan,
     };
   }
 
@@ -154,21 +164,25 @@ export async function executeAiTask({
   const systemPrompt = buildSawolSystemPrompt(context);
   const userPrompt = buildSawolUserPrompt(context);
 
-  if (provider === "mock") {
-    return runMockTask({ context });
-  }
+  const ai =
+    provider === "mock"
+      ? await runMockTask({ context })
+      : provider === "gemini"
+        ? await runGeminiTask({
+            systemPrompt,
+            userPrompt,
+            useWebSearch,
+          })
+        : await runOpenAiTask({
+            systemPrompt,
+            userPrompt,
+            useWebSearch,
+          });
 
-  if (provider === "gemini") {
-    return runGeminiTask({
-      systemPrompt,
-      userPrompt,
-      useWebSearch,
-    });
-  }
+  ai.result.artifact_plan = artifactPlan;
 
-  return runOpenAiTask({
-    systemPrompt,
-    userPrompt,
-    useWebSearch,
-  });
+  return {
+    ...ai,
+    artifactPlan,
+  };
 }

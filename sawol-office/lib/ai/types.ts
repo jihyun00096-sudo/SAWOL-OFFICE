@@ -1,3 +1,8 @@
+import type {
+  ArtifactPlan,
+  GeneratedArtifact,
+} from "@/lib/artifacts/types";
+
 export type AiResultSource = {
   title: string;
   url: string;
@@ -33,6 +38,12 @@ export type AiTaskResult = {
   needs_human_review: boolean;
   sources: AiResultSource[];
   asset?: AiTaskAsset | null;
+  /**
+   * STEP25 범용 산출물.
+   * 기존 IMAGE asset은 호환성을 위해 그대로 유지합니다.
+   */
+  artifacts?: GeneratedArtifact[] | null;
+  artifact_plan?: ArtifactPlan | null;
 };
 
 export type SawolAiContext = {
