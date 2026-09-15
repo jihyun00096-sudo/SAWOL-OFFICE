@@ -87,7 +87,7 @@ export function assessWorkflowComplexity(task:{title:string;description:string|n
   const hasVerification = /출처|근거|사실\s*확인|검증|팩트\s*체크/.test(text);
   const hasVisualDeliverable = /이미지|카드뉴스|썸네일|포스터|배너|일러스트|디자인|사진/.test(text);
   const hasSequentialLanguage =
-    /조사.*(정리|분석|기획|제작)|정리.*(이미지|카드뉴스|제작)|(?:뒤|후|다음).*?(?:이미지|제작|결과)|마지막.*(?:이미지|결과|제출)/s.test(text);
+    /조사[\s\S]*(정리|분석|기획|제작)|정리[\s\S]*(이미지|카드뉴스|제작)|(?:뒤|후|다음)[\s\S]*?(?:이미지|제작|결과)|마지막[\s\S]*(?:이미지|결과|제출)/.test(text);
 
   // 조사/검증 + 시각 산출물은 서로 다른 전문 단계가 필요한 대표적인 협업 업무입니다.
   if (hasResearch && hasVisualDeliverable) {
