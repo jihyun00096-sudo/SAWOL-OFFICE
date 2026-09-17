@@ -357,8 +357,8 @@ export default async function DashboardPage() {
     <OfficeShell pendingApprovals={pendingApprovals}>
       <PageHeader
         eyebrow="대표실"
-        title="오늘의 SAWOL OFFICE"
-        description="회사가 지금 무엇을 하고 있는지, 대표가 무엇만 확인하면 되는지 한 화면에서 봅니다."
+        title="대표 관제실"
+        description="회사가 알아서 움직이고, 대표는 판단이 필요한 것과 최종 결과만 확인합니다."
         action={
           <Link
             href="/command"
@@ -369,7 +369,163 @@ export default async function DashboardPage() {
         }
       />
 
-      <section className="mt-6 grid grid-cols-2 gap-3 lg:mt-7 lg:grid-cols-6">
+      <section className="mt-6 overflow-hidden rounded-[24px] border border-[#DDE5EF] bg-white shadow-[0_16px_50px_rgba(32,57,83,0.05)] lg:mt-7">
+        <div className="grid lg:grid-cols-[1.3fr_0.7fr]">
+          <div className="border-b border-[#E9EDF2] p-5 sm:p-6 lg:border-b-0 lg:border-r lg:p-7">
+            <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded-full bg-[#EDF5FB] px-2.5 py-1 text-[9px] font-semibold text-[#46779A]">
+                    CEO CONTROL ROOM
+                  </span>
+                  <span
+                    className={`rounded-full px-2.5 py-1 text-[9px] font-semibold ${
+                      attentionCount
+                        ? "bg-[#FFF4DC] text-[#89661E]"
+                        : "bg-[#EEF8F2] text-[#3F7555]"
+                    }`}
+                  >
+                    {attentionCount ? `대표 판단 ${attentionCount}건` : "대표 판단 없음"}
+                  </span>
+                </div>
+
+                <h2 className="mt-4 text-[20px] font-bold tracking-[-0.04em] text-[#20262D] sm:text-[24px]">
+                  지금은 {attentionCount ? "대표 판단이 필요한 업무가 있습니다." : "회사가 정상적으로 운영 중입니다."}
+                </h2>
+
+                <p className="mt-3 max-w-[760px] break-keep text-[12px] leading-6 text-[#66717D] sm:text-[13px]">
+                  {briefing}
+                </p>
+              </div>
+
+              <div className="flex shrink-0 flex-wrap gap-2">
+                {pendingApprovals > 0 ? (
+                  <Link
+                    href="/approvals"
+                    className="flex h-10 items-center justify-center rounded-[11px] bg-[#263B4B] px-4 text-[10px] font-semibold text-white transition hover:bg-[#1D2E3A]"
+                  >
+                    승인 {pendingApprovals}건 확인
+                  </Link>
+                ) : null}
+                <Link
+                  href="/command"
+                  className="flex h-10 items-center justify-center rounded-[11px] border border-[#DCE4EA] bg-white px-4 text-[10px] font-semibold text-[#596773] transition hover:bg-[#F7FAFC]"
+                >
+                  새 업무 지시
+                </Link>
+              </div>
+            </div>
+
+            <div className="mt-6 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+              <Link
+                href="/projects"
+                className="rounded-[15px] border border-[#E7ECF0] bg-[#FAFCFD] p-3.5 transition hover:border-[#C7DAE8] hover:bg-[#F6FAFC]"
+              >
+                <p className="text-[9px] font-medium text-[#89939D]">진행 프로젝트</p>
+                <p className="mt-2 text-[21px] font-black tracking-[-0.04em] text-[#263B4B]">
+                  {n(summary.active_projects)}
+                </p>
+                <p className="mt-1 text-[8px] text-[#A0A7AF]">전체 운영 단위</p>
+              </Link>
+
+              <Link
+                href="/tasks"
+                className="rounded-[15px] border border-[#DDE9F2] bg-[#F7FBFE] p-3.5 transition hover:border-[#B8D2E4]"
+              >
+                <p className="text-[9px] font-medium text-[#66839A]">진행 업무</p>
+                <p className="mt-2 text-[21px] font-black tracking-[-0.04em] text-[#426D8C]">
+                  {n(summary.active_tasks)}
+                </p>
+                <p className="mt-1 text-[8px] text-[#8CA1B0]">AUTO · MANUAL 포함</p>
+              </Link>
+
+              <Link
+                href="/office"
+                className="rounded-[15px] border border-[#E4E8EC] bg-white p-3.5 transition hover:border-[#CBD5DD] hover:bg-[#FBFCFD]"
+              >
+                <p className="text-[9px] font-medium text-[#89939D]">활동 직원</p>
+                <p className="mt-2 text-[21px] font-black tracking-[-0.04em] text-[#35424C]">
+                  {uniqueLiveEmployees.length || fallbackWorkingEmployees.length}
+                </p>
+                <p className="mt-1 text-[8px] text-[#A0A7AF]">현재 실무 투입</p>
+              </Link>
+
+              <Link
+                href="/results"
+                className="rounded-[15px] border border-[#E4E8EC] bg-white p-3.5 transition hover:border-[#CBD5DD] hover:bg-[#FBFCFD]"
+              >
+                <p className="text-[9px] font-medium text-[#89939D]">오늘 완료</p>
+                <p className="mt-2 text-[21px] font-black tracking-[-0.04em] text-[#35424C]">
+                  {n(summary.completed_today)}
+                </p>
+                <p className="mt-1 text-[8px] text-[#A0A7AF]">최종 완료 업무</p>
+              </Link>
+            </div>
+          </div>
+
+          <div className="bg-[#F8FAFC] p-5 sm:p-6 lg:p-7">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[10px] font-semibold text-[#53616D]">윤서진 비서실장</p>
+                <p className="mt-1 text-[9px] text-[#949DA6]">대표 판단 항목 정리</p>
+              </div>
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#DCEAF4] text-[11px] font-bold text-[#4E7896]">
+                윤
+              </div>
+            </div>
+
+            <div className="mt-4 space-y-2">
+              <Link
+                href="/approvals"
+                className="flex items-center justify-between gap-3 rounded-[13px] border border-[#E5E9ED] bg-white px-3.5 py-3 transition hover:border-[#CFD9E1]"
+              >
+                <div>
+                  <p className="text-[9px] font-semibold text-[#4D5964]">최종 승인</p>
+                  <p className="mt-1 text-[8px] text-[#9AA1A9]">결과 확인 후 승인 · 반려</p>
+                </div>
+                <span className={`text-[16px] font-black ${pendingApprovals ? "text-[#9A7020]" : "text-[#B7BDC4]"}`}>
+                  {pendingApprovals}
+                </span>
+              </Link>
+
+              <Link
+                href="/queue"
+                className="flex items-center justify-between gap-3 rounded-[13px] border border-[#E5E9ED] bg-white px-3.5 py-3 transition hover:border-[#CFD9E1]"
+              >
+                <div>
+                  <p className="text-[9px] font-semibold text-[#4D5964]">대표 판단 필요</p>
+                  <p className="mt-1 text-[8px] text-[#9AA1A9]">자동 처리 일시 정지</p>
+                </div>
+                <span className={`text-[16px] font-black ${pausedJobs.length ? "text-[#9A7020]" : "text-[#B7BDC4]"}`}>
+                  {pausedJobs.length}
+                </span>
+              </Link>
+
+              <Link
+                href="/queue"
+                className="flex items-center justify-between gap-3 rounded-[13px] border border-[#E5E9ED] bg-white px-3.5 py-3 transition hover:border-[#CFD9E1]"
+              >
+                <div>
+                  <p className="text-[9px] font-semibold text-[#4D5964]">오류 · 복구</p>
+                  <p className="mt-1 text-[8px] text-[#9AA1A9]">실패 작업 확인</p>
+                </div>
+                <span className={`text-[16px] font-black ${failedJobs.length ? "text-[#B34A4A]" : "text-[#B7BDC4]"}`}>
+                  {failedJobs.length}
+                </span>
+              </Link>
+
+              <Link
+                href="/secretary"
+                className="mt-3 flex items-center justify-center rounded-[11px] border border-[#CFE0EC] bg-[#F4F9FC] px-4 py-3 text-[9px] font-semibold text-[#4E7896] transition hover:bg-[#EDF6FB]"
+              >
+                비서실 전체 관제 보기 →
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-6">
         <StatCard
           label="진행 중"
           value={n(summary.active_tasks)}
@@ -413,40 +569,54 @@ export default async function DashboardPage() {
         />
       </section>
 
-      <section className="mt-4 rounded-[20px] border border-[#DCE4FF] bg-[#F8FAFF] p-4 sm:p-5 lg:p-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div className="min-w-0">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#3157D5] text-[12px] font-bold text-white">
-                윤
-              </div>
-              <div>
-                <p className="text-[13px] font-semibold text-[#17181C]">윤서진 비서실장</p>
-                <p className="mt-0.5 text-[10px] text-[#818895]">대표 브리핑</p>
-              </div>
-            </div>
-            <p className="mt-4 max-w-[850px] break-keep text-[12px] leading-6 text-[#4F5867] sm:text-[13px] sm:leading-7">
-              {briefing}
-            </p>
+      <section className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <Link
+          href="/office"
+          className="group rounded-[17px] border border-[#E6EAEE] bg-white p-4 transition hover:-translate-y-0.5 hover:border-[#C9D8E3] hover:shadow-sm"
+        >
+          <div className="flex items-center justify-between">
+            <span className="rounded-[9px] bg-[#EDF5FB] px-2 py-1 text-[8px] font-semibold text-[#4E7896]">LIVE</span>
+            <span className="text-[9px] text-[#A0A7AF] group-hover:text-[#4E7896]">열기 →</span>
           </div>
+          <p className="mt-3 text-[11px] font-semibold text-[#303941]">라이브 오피스</p>
+          <p className="mt-1 text-[9px] leading-4 text-[#929AA3]">90명 직원과 업무 이동을 시각적으로 확인</p>
+        </Link>
 
-          <div className="flex shrink-0 flex-wrap gap-2">
-            {pendingApprovals > 0 ? (
-              <Link
-                href="/approvals"
-                className="flex h-9 items-center justify-center rounded-[9px] bg-[#3157D5] px-3.5 text-[10px] font-semibold text-white"
-              >
-                승인 {pendingApprovals}건 확인
-              </Link>
-            ) : null}
-            <Link
-              href="/queue"
-              className="flex h-9 items-center justify-center rounded-[9px] border border-[#D9E1F8] bg-white px-3.5 text-[10px] font-semibold text-[#596579]"
-            >
-              실행 현황 보기
-            </Link>
+        <Link
+          href="/secretary"
+          className="group rounded-[17px] border border-[#E6EAEE] bg-white p-4 transition hover:-translate-y-0.5 hover:border-[#C9D8E3] hover:shadow-sm"
+        >
+          <div className="flex items-center justify-between">
+            <span className="rounded-[9px] bg-[#F1F4F6] px-2 py-1 text-[8px] font-semibold text-[#68747E]">CONTROL</span>
+            <span className="text-[9px] text-[#A0A7AF] group-hover:text-[#4E7896]">열기 →</span>
           </div>
-        </div>
+          <p className="mt-3 text-[11px] font-semibold text-[#303941]">비서실</p>
+          <p className="mt-1 text-[9px] leading-4 text-[#929AA3]">배정 · 협업 · 취합 · 대표 보고 흐름</p>
+        </Link>
+
+        <Link
+          href="/employees"
+          className="group rounded-[17px] border border-[#E6EAEE] bg-white p-4 transition hover:-translate-y-0.5 hover:border-[#C9D8E3] hover:shadow-sm"
+        >
+          <div className="flex items-center justify-between">
+            <span className="rounded-[9px] bg-[#F1F4F6] px-2 py-1 text-[8px] font-semibold text-[#68747E]">ORG</span>
+            <span className="text-[9px] text-[#A0A7AF] group-hover:text-[#4E7896]">열기 →</span>
+          </div>
+          <p className="mt-3 text-[11px] font-semibold text-[#303941]">조직 · 직원</p>
+          <p className="mt-1 text-[9px] leading-4 text-[#929AA3]">부서 가동률과 직원 업무량 확인</p>
+        </Link>
+
+        <Link
+          href="/projects"
+          className="group rounded-[17px] border border-[#E6EAEE] bg-white p-4 transition hover:-translate-y-0.5 hover:border-[#C9D8E3] hover:shadow-sm"
+        >
+          <div className="flex items-center justify-between">
+            <span className="rounded-[9px] bg-[#F1F4F6] px-2 py-1 text-[8px] font-semibold text-[#68747E]">PROJECT</span>
+            <span className="text-[9px] text-[#A0A7AF] group-hover:text-[#4E7896]">열기 →</span>
+          </div>
+          <p className="mt-3 text-[11px] font-semibold text-[#303941]">프로젝트 관제</p>
+          <p className="mt-1 text-[9px] leading-4 text-[#929AA3]">프로젝트 단위 진행률과 연결 업무 확인</p>
+        </Link>
       </section>
 
       <div className="mt-6 grid grid-cols-1 gap-5 xl:grid-cols-[1.35fr_0.85fr]">
