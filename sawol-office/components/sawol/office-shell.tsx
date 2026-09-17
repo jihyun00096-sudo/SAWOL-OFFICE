@@ -7,6 +7,7 @@ const items = [
   { href: "/dashboard", label: "대표실", iconName: "home" as const },
   { href: "/office", label: "라이브 오피스", iconName: "users" as const },
   { href: "/command", label: "업무지시", iconName: "command" as const },
+  { href: "/secretary", label: "비서실", iconName: "task" as const },
   { href: "/projects", label: "프로젝트", iconName: "folder" as const },
   { href: "/tasks", label: "전체 업무", iconName: "task" as const },
   { href: "/employees", label: "직원", iconName: "users" as const },
