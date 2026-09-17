@@ -8,7 +8,12 @@ import { requireSawolAdmin } from "@/lib/auth/require-sawol-admin";
 
 export const dynamic = "force-dynamic";
 
-export default async function CommandPage() {
+export default async function CommandPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ project_id?: string }>;
+}) {
+  const query = await searchParams;
   const { supabase } = await requireSawolAdmin();
 
   const [
@@ -61,6 +66,7 @@ export default async function CommandPage() {
           projects={(projects ?? []) as any}
           employees={(employees ?? []) as any}
           workloads={workloads}
+          initialProjectId={query.project_id ?? ""}
         />
       </div>
     </OfficeShell>

@@ -63,11 +63,13 @@ export function CommandForm({
   projects,
   employees,
   workloads,
+  initialProjectId = "",
 }: {
   departments: Department[];
   projects: Project[];
   employees: Employee[];
   workloads: AssignmentWorkload[];
+  initialProjectId?: string;
 }) {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement | null>(null);
@@ -79,7 +81,7 @@ export function CommandForm({
 
   const [taskType, setTaskType] = useState("OTHER");
   const [priority, setPriority] = useState("NORMAL");
-  const [projectId, setProjectId] = useState("");
+  const [projectId, setProjectId] = useState(initialProjectId);
   const [departmentId, setDepartmentId] = useState("");
   const [employeeId, setEmployeeId] = useState("");
   const [requiresApproval, setRequiresApproval] = useState(false);
@@ -163,7 +165,9 @@ export function CommandForm({
     setAnalysis(enrichedAnalysis);
     setTaskType(enrichedAnalysis.taskType);
     setPriority(enrichedAnalysis.priority);
-    setProjectId(enrichedAnalysis.projectId);
+    const resolvedProjectId = initialProjectId || enrichedAnalysis.projectId;
+    enrichedAnalysis.projectId = resolvedProjectId;
+    setProjectId(resolvedProjectId);
     setDepartmentId(enrichedAnalysis.departmentId);
     setEmployeeId(enrichedAnalysis.employeeId);
     setRequiresApproval(executionMode === "AUTO" ? true : enrichedAnalysis.requiresCeoApproval);
@@ -178,7 +182,7 @@ export function CommandForm({
     setAnalysis(null);
     setTaskType("OTHER");
     setPriority("NORMAL");
-    setProjectId("");
+    setProjectId(initialProjectId);
     setDepartmentId("");
     setEmployeeId("");
     setRequiresApproval(false);

@@ -18,6 +18,13 @@ type Project = {
   progress: number;
   current_stage: string | null;
   created_at: string;
+  live_progress?: number;
+  task_count?: number;
+  active_count?: number;
+  completed_count?: number;
+  attention_count?: number;
+  result_count?: number;
+  approval_count?: number;
 };
 
 export function ProjectBrowser({ projects }: { projects: Project[] }) {
@@ -116,18 +123,22 @@ export function ProjectBrowser({ projects }: { projects: Project[] }) {
                 </p>
               </div>
 
-              <div className="w-full sm:w-[220px]">
+              <div className="w-full sm:w-[330px]">
                 <div className="flex items-center justify-between text-[10px] text-[#8C929D]">
-                  <span>진행률</span>
-                  <span>{project.progress}%</span>
+                  <span>실시간 업무 진행률</span>
+                  <span>{project.live_progress ?? project.progress}%</span>
                 </div>
                 <div className="mt-2 h-1.5 rounded-full bg-[#ECEEF2]">
                   <div
                     className="h-full rounded-full bg-[#3157D5]"
-                    style={{
-                      width: `${Math.max(0, Math.min(100, project.progress))}%`,
-                    }}
+                    style={{ width: `${Math.max(0, Math.min(100, project.live_progress ?? project.progress))}%` }}
                   />
+                </div>
+                <div className="mt-3 grid grid-cols-4 gap-1.5 text-center">
+                  <div className="rounded-[8px] bg-[#F6F7F9] px-2 py-1.5"><p className="text-[8px] text-[#9A9FAA]">업무</p><p className="mt-0.5 text-[10px] font-semibold">{project.task_count ?? 0}</p></div>
+                  <div className="rounded-[8px] bg-[#F2F6FF] px-2 py-1.5"><p className="text-[8px] text-[#7B8FBF]">진행</p><p className="mt-0.5 text-[10px] font-semibold text-[#3157D5]">{project.active_count ?? 0}</p></div>
+                  <div className="rounded-[8px] bg-[#F3FAF6] px-2 py-1.5"><p className="text-[8px] text-[#7C9988]">완료</p><p className="mt-0.5 text-[10px] font-semibold text-[#25855A]">{project.completed_count ?? 0}</p></div>
+                  <div className={`rounded-[8px] px-2 py-1.5 ${(project.attention_count ?? 0) > 0 ? "bg-[#FFF6EF]" : "bg-[#F6F7F9]"}`}><p className="text-[8px] text-[#9A9FAA]">확인</p><p className={`mt-0.5 text-[10px] font-semibold ${(project.attention_count ?? 0) > 0 ? "text-[#B76B35]" : ""}`}>{project.attention_count ?? 0}</p></div>
                 </div>
               </div>
             </div>
