@@ -5,6 +5,7 @@ import {
   runUrl,
   sendOrUpdateDiscordChannelMessage,
   taskLinkButtons,
+  updateDiscordMessage,
 } from "@/lib/discord/notify";
 
 type JsonMap = Record<string, any>;
@@ -256,6 +257,42 @@ async function upsertChannelMessage(args: {
   return result;
 }
 
+
+async function updateStoredDiscordMessage(args: {
+  job: any;
+  messageKey: string;
+  content: string;
+  components?: Record<string, unknown>[];
+}) {
+  const metadata = safeMetadata(args.job.metadata);
+  const discordMessages = safeMetadata(metadata.discord_messages);
+  const previous = safeMetadata(discordMessages[args.messageKey]);
+
+  const channelId =
+    typeof previous.channel_id === "string" ? previous.channel_id : null;
+  const messageId =
+    typeof previous.message_id === "string" ? previous.message_id : null;
+
+  if (!channelId || !messageId) return false;
+
+  try {
+    await updateDiscordMessage({
+      channelId,
+      messageId,
+      content: args.content,
+      components: args.components,
+      suppressEmbeds: true,
+    });
+    return true;
+  } catch (error) {
+    console.error(
+      `Discord stored message update failed: ${args.messageKey}`,
+      error,
+    );
+    return false;
+  }
+}
+
 export async function notifyDiscordForJob(supabase: any, job: any) {
   if (!job?.task_id) return { sent: false };
 
@@ -299,6 +336,31 @@ export async function notifyDiscordForJob(supabase: any, job: any) {
       footer: `**반려 사유**\n> ${truncate(reason, 240).replace(/\\n/g, "\\n> ")}`,
       showProgress: false,
     });
+
+    await Promise.all([
+      updateStoredDiscordMessage({
+        job,
+        messageKey: "approval",
+        content: buildCompactTaskBlock({
+          ...baseInfo,
+          header: "🔁 **대표 반려 · 재작업 시작**",
+          footer: `**반려 사유**\n> ${truncate(reason, 240).replace(/\n/g, "\n> ")}`,
+          showProgress: false,
+        }),
+        components: taskLinkButtons(task.id),
+      }),
+      updateStoredDiscordMessage({
+        job,
+        messageKey: "progress",
+        content: buildCompactTaskBlock({
+          ...baseInfo,
+          header: "🔁 **재작업 진행 예정**",
+          footer: "대표 반려 사유를 반영해 AUTO 재작업을 시작합니다.",
+          showProgress: false,
+        }),
+        components: taskLinkButtons(task.id),
+      }),
+    ]);
 
     await upsertChannelMessage({
       supabase,
@@ -370,6 +432,24 @@ export async function notifyDiscordForJob(supabase: any, job: any) {
       showProgress: false,
     });
 
+    await updateStoredDiscordMessage({
+      job,
+      messageKey: "progress",
+      content: buildCompactTaskBlock({
+        ...baseInfo,
+        header: "🟡 **실무 완료 · 대표 승인 대기**",
+        footer: artifact.summary
+          ? `**결과 요약**\n> ${truncate(artifact.summary, 220).replace(/\n/g, "\n> ")}`
+          : "실무 처리가 끝나 대표 승인 단계로 이동했습니다.",
+        showProgress: false,
+      }),
+      components: resultLinkButtons({
+        taskId: task.id,
+        resultUrl: artifact.resultUrl,
+        runUrl: artifact.runUrl,
+      }),
+    });
+
     await upsertChannelMessage({
       supabase,
       job,
@@ -403,17 +483,43 @@ export async function notifyDiscordForJob(supabase: any, job: any) {
       showProgress: false,
     });
 
+    const settledContent = buildCompactTaskBlock({
+      ...baseInfo,
+      header: "✅ **대표 승인 · 업무 완료**",
+      footer: artifact.summary
+        ? `**최종 결과**\n> ${truncate(artifact.summary, 240).replace(/\n/g, "\n> ")}`
+        : "대표 승인이 완료되어 최종 완료 처리되었습니다.",
+      showProgress: false,
+    });
+
+    const settledComponents = resultLinkButtons({
+      taskId: task.id,
+      resultUrl: artifact.resultUrl,
+      runUrl: artifact.runUrl,
+    });
+
+    await Promise.all([
+      updateStoredDiscordMessage({
+        job,
+        messageKey: "progress",
+        content: settledContent,
+        components: settledComponents,
+      }),
+      updateStoredDiscordMessage({
+        job,
+        messageKey: "approval",
+        content: settledContent,
+        components: settledComponents,
+      }),
+    ]);
+
     await upsertChannelMessage({
       supabase,
       job,
       channelName: "업무-완료보고",
       messageKey: "completed",
       content,
-      components: resultLinkButtons({
-        taskId: task.id,
-        resultUrl: artifact.resultUrl,
-        runUrl: artifact.runUrl,
-      }),
+      components: settledComponents,
     });
 
     return {
@@ -431,6 +537,13 @@ export async function notifyDiscordForJob(supabase: any, job: any) {
       footer:
         "자동 처리만으로 판단하기 어려운 상태입니다. 아래 **업무 상세** 버튼에서 확인해주세요.",
       showProgress: false,
+    });
+
+    await updateStoredDiscordMessage({
+      job,
+      messageKey: "progress",
+      content,
+      components: taskLinkButtons(task.id),
     });
 
     await upsertChannelMessage({
@@ -457,6 +570,13 @@ export async function notifyDiscordForJob(supabase: any, job: any) {
       footer:
         "기존 작업 내용은 보존되어 있습니다. 아래 **업무 상세**에서 확인해주세요.",
       showProgress: false,
+    });
+
+    await updateStoredDiscordMessage({
+      job,
+      messageKey: "progress",
+      content,
+      components: taskLinkButtons(task.id),
     });
 
     await upsertChannelMessage({

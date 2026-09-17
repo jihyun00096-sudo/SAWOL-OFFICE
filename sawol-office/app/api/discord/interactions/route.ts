@@ -4,7 +4,7 @@ import { verifyDiscordRequest } from "@/lib/discord/verify";
 import { createDiscordAutoTask } from "@/lib/discord/create-task";
 import {
   sendDiscordChannelMessage,
-  taskUrl,
+  taskLinkButtons,
 } from "@/lib/discord/notify";
 import {
   finalizeTaskFromControl,
@@ -22,9 +22,15 @@ function json(data: unknown, status = 200) {
 async function safeChannelMessage(
   channelName: string,
   content: string,
+  options?: {
+    components?: Record<string, unknown>[];
+  },
 ) {
   try {
-    await sendDiscordChannelMessage(channelName, content);
+    await sendDiscordChannelMessage(channelName, content, {
+      components: options?.components,
+      suppressEmbeds: true,
+    });
   } catch (error) {
     console.error(`Discord routing failed: ${channelName}`, error);
   }
@@ -340,7 +346,6 @@ export async function POST(request: Request) {
           },
         );
 
-        const detailUrl = taskUrl(task.id);
 
         await editOriginalInteraction(
           applicationId,
@@ -364,8 +369,8 @@ export async function POST(request: Request) {
             `업무 코드: ${task.task_code}`,
             "",
             "대표 지시를 접수했습니다. 업무 분석·분류·직원 배정을 시작합니다.",
-            `업무 상세: ${detailUrl}`,
           ].join("\n"),
+          { components: taskLinkButtons(task.id) },
         );
 
         await safeChannelMessage(
@@ -381,9 +386,8 @@ export async function POST(request: Request) {
             "",
             "**대표 원문**",
             instruction.slice(0, 1400),
-            "",
-            `업무 상세: ${detailUrl}`,
           ].join("\n"),
+          { components: taskLinkButtons(task.id) },
         );
       } catch (error) {
         await editOriginalInteraction(
