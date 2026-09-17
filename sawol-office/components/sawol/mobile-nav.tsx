@@ -23,7 +23,7 @@ const items = [
   { href: "/secretary", label: "비서실", icon: TaskIcon },
   { href: "/projects", label: "프로젝트", icon: FolderIcon },
   { href: "/tasks", label: "전체 업무", icon: TaskIcon },
-  { href: "/employees", label: "직원", icon: UsersIcon },
+  { href: "/employees", label: "조직·직원", icon: UsersIcon },
   { href: "/approvals", label: "승인함", icon: CheckIcon },
   { href: "/results", label: "결과함", icon: ResultIcon },
   { href: "/memory", label: "기억센터", icon: MemoryIcon },

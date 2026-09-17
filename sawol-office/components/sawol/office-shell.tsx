@@ -10,7 +10,7 @@ const items = [
   { href: "/secretary", label: "비서실", iconName: "task" as const },
   { href: "/projects", label: "프로젝트", iconName: "folder" as const },
   { href: "/tasks", label: "전체 업무", iconName: "task" as const },
-  { href: "/employees", label: "직원", iconName: "users" as const },
+  { href: "/employees", label: "조직·직원", iconName: "users" as const },
   { href: "/approvals", label: "승인함", iconName: "check" as const },
   { href: "/results", label: "결과함", iconName: "result" as const },
   { href: "/memory", label: "기억센터", iconName: "memory" as const },
