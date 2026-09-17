@@ -154,7 +154,7 @@ export function buildSawolUserPrompt(context: SawolAiContext) {
   ]);
 
   const memoryRows = context.memories
-    .slice(0, 12)
+    .slice(0, 16)
     .map((memory) =>
       compactRow(memory, [
         "memory_code",
@@ -165,6 +165,10 @@ export function buildSawolUserPrompt(context: SawolAiContext) {
         "importance",
         "priority",
         "scope",
+        "source",
+        "project_id",
+        "confidence",
+        "last_verified_at",
       ]),
     )
     .filter(Boolean);
@@ -239,7 +243,10 @@ ${
 - 대표 반려 피드백이 있으면 가장 높은 우선순위로 수정하세요.
 - 반려 피드백이 재조사를 요구하면 이전 답안을 고쳐 쓰는 방식으로 끝내지 말고 새 근거를 기준으로 다시 작성하세요.
 - 프로젝트가 있으면 프로젝트 목적과 원하는 결과를 함께 반영하세요.
+- 회사 기억은 SAWOL OFFICE가 AI Provider와 독립적으로 선택해 전달한 운영 컨텍스트입니다.
 - 회사 기억은 관련 있을 때만 적용하고 무관한 기억을 억지로 끼워 넣지 마세요.
+- 프로젝트 전용 기억은 해당 프로젝트 맥락에서만 사용하고, 대표 규칙·대표 기억은 충돌하는 하위 기억보다 우선합니다.
+- 기억의 confidence가 낮거나 오래된 정보라면 확정 사실처럼 확대하지 마세요.
 - 요청된 산출물 자체를 만들어 제출하세요. 작업 방법 안내나 템플릿만 제출하지 마세요.
 - 협업 최종 단계에서는 선행 직원 결과를 짧게 요약하지 말고, 대표 원문의 모든 요구사항을 다시 대조해 완성된 최종 산출물로 통합하세요.
 - 대표 원문에 번호로 나열된 요구사항이 있으면 누락 없이 모두 반영했는지 제출 직전에 자체 점검하세요.

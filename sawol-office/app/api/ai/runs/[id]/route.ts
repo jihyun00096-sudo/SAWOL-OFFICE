@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { executeAiTask } from "@/lib/ai/provider";
 import type { SawolAiContext } from "@/lib/ai/types";
 import { shouldUseWebResearch } from "@/lib/ai/research-policy";
+import { selectRelevantMemories } from "@/lib/ai/memory-context";
 import { persistGeneratedImageAsset } from "@/lib/ai/image-storage";
 import { generateRequestedFileArtifacts } from "@/lib/artifacts/generate";
 import { persistGeneratedArtifacts } from "@/lib/artifacts/storage";
@@ -102,7 +103,12 @@ export async function POST(
     (run.employee_id || task.assigned_employee_id)
       ? supabase.from("employees").select("*").eq("id", run.employee_id || task.assigned_employee_id).maybeSingle()
       : Promise.resolve({ data: null, error: null }),
-    supabase.from("memories").select("*").eq("status", "ACTIVE").limit(12),
+    supabase
+      .from("memories")
+      .select("*")
+      .eq("status", "ACTIVE")
+      .order("updated_at", { ascending: false })
+      .limit(80),
     task.workflow_id && !task.is_workflow_root
       ? supabase.from("task_handoffs").select("id, from_task_id, to_task_id, title, summary, content, created_at").eq("to_task_id", task.id).eq("status", "AVAILABLE").order("created_at", { ascending: true })
       : Promise.resolve({ data: [], error: null }),
@@ -112,15 +118,24 @@ export async function POST(
     supabase.from("task_feedback").select("reason, created_at").eq("root_task_id", task.parent_task_id || task.id).eq("status", "ACTIVE").order("created_at", { ascending: false }).limit(3),
   ]);
 
-  const context: SawolAiContext = {
+  const baseContext: SawolAiContext = {
     task: task as Record<string, unknown>,
     project: (projectResult.data as Record<string, unknown> | null) ?? null,
     department: (departmentResult.data as Record<string, unknown> | null) ?? null,
     employee: (employeeResult.data as Record<string, unknown> | null) ?? null,
-    memories: (memoryResult.data as Record<string, unknown>[] | null) ?? [],
+    memories: [],
     handoffs: (handoffResult.data as Record<string, unknown>[] | null) ?? [],
     rootTask: (rootTaskResult.data as Record<string, unknown> | null) ?? null,
     feedbacks: (feedbackResult.data as Record<string, unknown>[] | null) ?? [],
+  };
+
+  const context: SawolAiContext = {
+    ...baseContext,
+    memories: selectRelevantMemories({
+      context: baseContext,
+      memories:
+        (memoryResult.data as Record<string, unknown>[] | null) ?? [],
+    }),
   };
 
   const now = new Date().toISOString();

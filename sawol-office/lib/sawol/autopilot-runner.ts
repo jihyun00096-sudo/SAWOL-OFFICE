@@ -2,6 +2,7 @@ import { executeAiTask } from "@/lib/ai/provider";
 import { createHumanCode } from "@/lib/sawol/code";
 import type { SawolAiContext } from "@/lib/ai/types";
 import { shouldUseWebResearch } from "@/lib/ai/research-policy";
+import { selectRelevantMemories } from "@/lib/ai/memory-context";
 import { ResearchInsufficientError } from "@/lib/ai/free-web-research";
 import { persistGeneratedImageAsset } from "@/lib/ai/image-storage";
 import { generateRequestedFileArtifacts } from "@/lib/artifacts/generate";
@@ -112,7 +113,8 @@ async function executeTask(supabase: any, task: any) {
       .from("memories")
       .select("*")
       .eq("status", "ACTIVE")
-      .limit(12),
+      .order("updated_at", { ascending: false })
+      .limit(80),
 
     task.workflow_id && !task.is_workflow_root
       ? supabase
@@ -144,15 +146,23 @@ async function executeTask(supabase: any, task: any) {
       .limit(3),
   ]);
 
-  const context: SawolAiContext = {
+  const baseContext: SawolAiContext = {
     task,
     project: projectResult.data ?? null,
     department: departmentResult.data ?? null,
     employee: employeeResult.data ?? null,
-    memories: memoryResult.data ?? [],
+    memories: [],
     handoffs: handoffResult.data ?? [],
     rootTask: rootTaskResult.data ?? null,
     feedbacks: feedbackResult.data ?? [],
+  };
+
+  const context: SawolAiContext = {
+    ...baseContext,
+    memories: selectRelevantMemories({
+      context: baseContext,
+      memories: memoryResult.data ?? [],
+    }),
   };
 
   try {
