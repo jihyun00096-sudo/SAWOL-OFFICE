@@ -142,7 +142,7 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ id:
               </p>
             </div>
             <span className="rounded-full bg-white px-2 py-1 text-[8px] font-semibold text-[#3157D5]">
-              STEP25 · {artifactPlan.items.length}개
+              STEP27 · {artifactPlan.items.length}개
             </span>
           </div>
 

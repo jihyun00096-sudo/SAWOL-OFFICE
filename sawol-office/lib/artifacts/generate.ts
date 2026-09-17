@@ -8,6 +8,7 @@ import type {
   ArtifactPlan,
   GeneratedArtifact,
 } from "@/lib/artifacts/types";
+import { generateExtendedArtifacts, hasExtendedArtifactRequest } from "@/lib/artifacts/office-files";
 
 type SheetSpec = {
   name: string;
@@ -769,9 +770,13 @@ export function shouldGenerateFileArtifacts(
   const parentTaskId = textOf(task.parent_task_id);
   const stepKey = textOf(task.workflow_step_key).toLowerCase();
 
-  const supported = plan.items.some((entry) =>
-    ["SPREADSHEET", "PDF"].includes(entry.kind),
-  );
+  const supported =
+    plan.items.some((entry) =>
+      (entry.kind === "SPREADSHEET" && ["xlsx", "csv"].includes(entry.format)) ||
+      (entry.kind === "DOCUMENT" && entry.format === "docx") ||
+      ["PDF", "PRESENTATION", "DATA", "ARCHIVE", "CODE"].includes(entry.kind) ||
+      (entry.kind === "TEXT" && ["txt", "md"].includes(entry.format)),
+    ) || hasExtendedArtifactRequest(plan);
 
   if (!supported) return false;
 
@@ -798,11 +803,19 @@ export async function generateRequestedFileArtifacts({
   }
 
   const wantsSpreadsheet = plan.items.some(
-    (entry) => entry.kind === "SPREADSHEET",
+    (entry) => entry.kind === "SPREADSHEET" && entry.format === "xlsx",
   );
   const wantsPdf = plan.items.some((entry) => entry.kind === "PDF");
 
-  if (!wantsSpreadsheet && !wantsPdf) return [];
+  const wantsExtended = hasExtendedArtifactRequest(plan);
+
+  if (!wantsSpreadsheet && !wantsPdf && !wantsExtended) return [];
+
+  const extendedArtifacts = wantsExtended
+    ? await generateExtendedArtifacts({ context, result, plan })
+    : [];
+
+  if (!wantsSpreadsheet && !wantsPdf) return extendedArtifacts;
 
   const { spec, model } = await buildContentSpec({
     context,
@@ -867,5 +880,5 @@ export async function generateRequestedFileArtifacts({
     });
   }
 
-  return artifacts;
+  return [...artifacts, ...extendedArtifacts];
 }

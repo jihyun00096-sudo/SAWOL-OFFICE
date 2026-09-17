@@ -48,7 +48,7 @@ export type ArtifactPlanItem = {
 };
 
 export type ArtifactPlan = {
-  version: "25.0";
+  version: "27.0";
   sourceText: string;
   items: ArtifactPlanItem[];
   isMultiArtifact: boolean;

@@ -76,7 +76,9 @@ export function planArtifactsFromText(sourceText: string): ArtifactPlan {
         reason: "대표 요청에서 Excel/XLSX/스프레드시트 산출물을 확인했습니다.",
       }),
     );
-  } else if (wantsCsv) {
+  }
+
+  if (wantsCsv) {
     items.push(
       item({
         id: "spreadsheet-csv",
@@ -258,6 +260,32 @@ export function planArtifactsFromText(sourceText: string): ArtifactPlan {
     );
   }
 
+  if (includesAny(text, ["markdown", "마크다운", "md 파일", "md파일"])) {
+    items.push(
+      item({
+        id: "text-markdown",
+        kind: "TEXT",
+        format: "md",
+        label: "Markdown 문서",
+        generator: "text",
+        reason: "대표 요청에서 Markdown/MD 파일 산출물을 확인했습니다.",
+      }),
+    );
+  }
+
+  if (includesAny(text, ["txt 파일", "txt파일", "텍스트 파일", "텍스트파일"])) {
+    items.push(
+      item({
+        id: "text-plain",
+        kind: "TEXT",
+        format: "txt",
+        label: "텍스트 파일",
+        generator: "text",
+        reason: "대표 요청에서 TXT 텍스트 파일 산출물을 확인했습니다.",
+      }),
+    );
+  }
+
   if (!items.length) {
     items.push(
       item({
@@ -288,7 +316,7 @@ export function planArtifactsFromText(sourceText: string): ArtifactPlan {
     items[0].kind;
 
   return {
-    version: "25.0",
+    version: "27.0",
     sourceText,
     items,
     isMultiArtifact: items.length > 1,
