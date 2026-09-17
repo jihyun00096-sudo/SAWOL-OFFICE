@@ -18,6 +18,7 @@ import {
 
 const items = [
   { href: "/dashboard", label: "대표실", icon: HomeIcon },
+  { href: "/office", label: "라이브 오피스", icon: UsersIcon },
   { href: "/command", label: "업무지시", icon: CommandIcon },
   { href: "/projects", label: "프로젝트", icon: FolderIcon },
   { href: "/tasks", label: "전체 업무", icon: TaskIcon },
