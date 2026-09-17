@@ -11,6 +11,10 @@ import {
   FileText,
   Focus,
   Handshake,
+  Maximize2,
+  Minimize2,
+  PanelRightOpen,
+  Route,
   Minus,
   Monitor,
   Plus,
@@ -20,7 +24,7 @@ import {
   X,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
 export type PixelOfficeEmployee = {
   id: string;
@@ -269,29 +273,31 @@ function DepartmentRoom({
   onSelectEmployee: (employee: PixelOfficeEmployee) => void;
 }) {
   const working = department.employees.filter((employee) => stateOf(employee) !== "idle").length;
-  const columns = department.employees.length > 12 ? 6 : department.employees.length > 7 ? 5 : 4;
+  const columns = department.employees.length > 14 ? 6 : department.employees.length > 9 ? 5 : 4;
 
   return (
-    <section className="relative overflow-hidden rounded-[18px] border border-[#C9D6E5] bg-[#F8FBFE] shadow-[0_10px_24px_rgba(62,84,109,.08)]">
-      <div className="absolute inset-0 opacity-[0.42]" style={{ backgroundImage: "linear-gradient(#DCE5EF 1px, transparent 1px), linear-gradient(90deg, #DCE5EF 1px, transparent 1px)", backgroundSize: "18px 18px" }} />
-      <div className="absolute inset-x-0 top-0 h-11 border-b border-[#BED0E2] bg-[#EAF3FB]/95" />
-      <div className="relative z-10 flex h-11 items-center justify-between px-3.5">
+    <section className="relative min-h-[286px] overflow-hidden rounded-[12px] border-[2px] border-[#B8C8D6] bg-[#F9FCFE] shadow-[0_10px_22px_rgba(55,75,96,.09)]">
+      <div className="absolute inset-0 opacity-[0.34]" style={{ backgroundImage: "linear-gradient(#DCE6EE 1px, transparent 1px), linear-gradient(90deg, #DCE6EE 1px, transparent 1px)", backgroundSize: "20px 20px" }} />
+      <div className="absolute inset-x-0 top-0 h-10 border-b border-[#BFD0DD] bg-[#EAF3FA]/95" />
+      <div className="absolute left-1/2 top-[38px] h-[8px] w-16 -translate-x-1/2 rounded-b-[4px] border-x border-b border-[#AAB9C7] bg-[#D7E0E7]" />
+      <div className="absolute right-3 top-[47px] flex items-center gap-1 rounded-[5px] border border-[#CBD7E1] bg-white/90 px-1.5 py-1 text-[6px] font-semibold text-[#7B8996]">
+        <span className="h-1.5 w-1.5 rounded-full bg-[#7EB7E7]" /> 출입문
+      </div>
+
+      <div className="relative z-10 flex h-10 items-center justify-between px-3.5">
         <div className="min-w-0">
-          <p className="truncate text-[10px] font-bold text-[#314153]">{department.name}</p>
-          <p className="mt-0.5 text-[7px] text-[#7E8D9C]">{department.employees.length}명 · {working}명 활동</p>
+          <p className="truncate text-[10px] font-black text-[#314153]">{department.name}</p>
+          <p className="mt-0.5 text-[6px] tracking-[0.08em] text-[#7E8D9C]">{department.code || department.departmentType}</p>
         </div>
         <div className="flex items-center gap-1.5">
-          {working > 0 ? <span className="h-2 w-2 animate-pulse rounded-full bg-[#4E99F5]" /> : <span className="h-2 w-2 rounded-full bg-[#BAC4CF]" />}
-          <span className="text-[7px] font-semibold text-[#788796]">{working > 0 ? "LIVE" : "IDLE"}</span>
+          <span className={`h-2 w-2 rounded-full ${working > 0 ? "animate-pulse bg-[#4E99F5]" : "bg-[#BAC4CF]"}`} />
+          <span className="text-[7px] font-semibold text-[#788796]">{working > 0 ? `${working} WORKING` : "IDLE"}</span>
         </div>
       </div>
 
-      <div className="relative z-10 min-h-[210px] p-3.5 pt-4">
+      <div className="relative z-10 min-h-[214px] px-3 pb-2 pt-7">
         {department.employees.length ? (
-          <div
-            className="grid gap-x-1.5 gap-y-2"
-            style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}
-          >
+          <div className="grid gap-x-1.5 gap-y-2" style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}>
             {department.employees.map((employee) => (
               <PixelPerson
                 key={employee.id}
@@ -304,16 +310,15 @@ function DepartmentRoom({
             ))}
           </div>
         ) : (
-          <div className="flex min-h-[180px] items-center justify-center text-[9px] text-[#A0A9B3]">배치된 직원이 없습니다.</div>
+          <div className="flex min-h-[178px] items-center justify-center text-[8px] text-[#A0A9B3]">현재 배치된 직원이 없습니다.</div>
         )}
       </div>
 
-      <div className="relative z-10 flex items-end justify-between border-t border-[#D6E1EB] bg-white/55 px-3 py-2">
-        <div className="flex items-center gap-1.5 text-[7px] text-[#8995A2]">
-          <Coffee className="h-3 w-3" />
-          대기 중인 직원도 자리에 표시됩니다
+      <div className="relative z-10 flex h-9 items-center justify-between border-t border-[#D6E1EB] bg-white/65 px-3">
+        <div className="flex items-center gap-1.5 text-[6px] text-[#8995A2]">
+          <Coffee className="h-3 w-3" /> {department.employees.length} seats · {working} active
         </div>
-        <PixelPlant />
+        <div className="scale-75 origin-right"><PixelPlant /></div>
       </div>
     </section>
   );
@@ -438,10 +443,14 @@ export function PixelLiveOffice({
   summary: PixelOfficeSummary;
   secretary: PixelOfficeEmployee | null;
 }) {
-  const [zoom, setZoom] = useState(0.9);
+  const [zoom, setZoom] = useState(0.82);
   const [selectedEmployee, setSelectedEmployee] = useState<PixelOfficeEmployee | null>(null);
   const [selectedWorkflowId, setSelectedWorkflowId] = useState<string | null>(workflows[0]?.id ?? null);
   const [showOnlyActive, setShowOnlyActive] = useState(false);
+  const [focusMode, setFocusMode] = useState(false);
+  const [drawer, setDrawer] = useState<"employee" | "workflows" | "handoffs" | "approval" | null>(null);
+  const scrollerRef = useRef<HTMLDivElement | null>(null);
+  const dragRef = useRef({ active: false, x: 0, y: 0, left: 0, top: 0 });
 
   const selectedWorkflow = useMemo(
     () => workflows.find((workflow) => workflow.id === selectedWorkflowId) ?? null,
@@ -463,221 +472,182 @@ export function PixelLiveOffice({
       .filter((department) => department.employees.length > 0);
   }, [departments, showOnlyActive]);
 
-  const roomColumns = visibleDepartments.length > 8 ? 3 : 2;
-  const canvasWidth = roomColumns === 3 ? 1520 : 1120;
-  const rows = Math.max(1, Math.ceil(visibleDepartments.length / roomColumns));
-  const canvasHeight = 330 + rows * 330;
+  const departmentPairs = useMemo(() => {
+    const pairs: Array<[PixelOfficeDepartment | null, PixelOfficeDepartment | null]> = [];
+    for (let index = 0; index < visibleDepartments.length; index += 2) {
+      pairs.push([visibleDepartments[index] ?? null, visibleDepartments[index + 1] ?? null]);
+    }
+    return pairs;
+  }, [visibleDepartments]);
+
+  const canvasWidth = 1440;
+  const canvasHeight = 450 + Math.max(1, departmentPairs.length) * 330 + 260;
+
+  function openEmployee(employee: PixelOfficeEmployee) {
+    setSelectedEmployee(employee);
+    setDrawer("employee");
+  }
+
+  function changeZoom(delta: number) {
+    setZoom((value) => Math.max(0.55, Math.min(1.25, Math.round((value + delta) * 100) / 100)));
+  }
+
+  const statItems = [
+    { label: "진행", value: summary.activeWorkflows, icon: BriefcaseBusiness },
+    { label: "활동", value: summary.activeEmployees, icon: UsersRound },
+    { label: "전체 직원", value: summary.totalEmployees, icon: Building2 },
+    { label: "인수인계", value: summary.recentHandoffs, icon: Handshake },
+    { label: "승인", value: summary.pendingApprovals, icon: FileCheck2 },
+  ] satisfies Array<{ label: string; value: number; icon: LucideIcon }>;
 
   return (
-    <div className="mt-5 space-y-4">
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        {([
-          { label: "진행 workflow", value: summary.activeWorkflows, icon: BriefcaseBusiness, textTone: "text-[#367BC8]", bgTone: "bg-[#EDF6FF]" },
-          { label: "활동 직원", value: summary.activeEmployees, icon: UsersRound, textTone: "text-[#367BC8]", bgTone: "bg-[#EDF6FF]" },
-          { label: "전체 직원", value: summary.totalEmployees, icon: Building2, textTone: "text-[#586675]", bgTone: "bg-[#F2F5F7]" },
-          { label: "최근 인수인계", value: summary.recentHandoffs, icon: Handshake, textTone: "text-[#2C8A68]", bgTone: "bg-[#EEF9F5]" },
-          { label: "대표 승인 대기", value: summary.pendingApprovals, icon: FileCheck2, textTone: "text-[#A97718]", bgTone: "bg-[#FFF8E8]" },
-        ] satisfies Array<{ label: string; value: number; icon: LucideIcon; textTone: string; bgTone: string }>).map(({ label, value, icon: Icon, textTone, bgTone }) => (
-          <div key={label} className="rounded-[16px] border border-[#E1E7ED] bg-white p-4 shadow-[0_5px_15px_rgba(65,82,101,.04)]">
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-[8px] font-semibold text-[#8B96A2]">{label}</p>
-              <div className={`flex h-7 w-7 items-center justify-center rounded-[9px] ${bgTone}`}><Icon className={`h-3.5 w-3.5 ${textTone}`} /></div>
+    <div className={focusMode ? "fixed inset-0 z-[120] bg-[#EAF1F6]" : "mt-5"}>
+      <section className={`relative overflow-hidden border border-[#D4DFE8] bg-[#EAF1F6] shadow-[0_18px_40px_rgba(37,58,80,.10)] ${focusMode ? "h-screen rounded-none" : "rounded-[22px]"}`}>
+        <div className="flex min-h-[58px] flex-wrap items-center justify-between gap-3 border-b border-[#D8E2EA] bg-white px-4 py-2.5 sm:px-5">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[11px] bg-[#263440] text-white"><Building2 className="h-4 w-4" /></div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2"><span className="h-2 w-2 animate-pulse rounded-full bg-[#4898E8]" /><p className="truncate text-[11px] font-black text-[#303E4B]">SAWOL LIVE OFFICE</p></div>
+              <p className="mt-0.5 truncate text-[7px] text-[#8795A2]">실제 업무 데이터로 움직이는 90인 규모 가상 오피스 · 복도 / 부서 / 비서실 / 대표실</p>
             </div>
-            <p className="mt-3 text-[22px] font-black tracking-[-0.04em] text-[#2F3944]">{value.toLocaleString()}</p>
           </div>
-        ))}
-      </div>
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_330px]">
-        <section className="min-w-0 overflow-hidden rounded-[20px] border border-[#D8E1EA] bg-[#F5F9FC] shadow-[0_14px_35px_rgba(47,72,96,.08)]">
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#DDE5EC] bg-white px-4 py-3.5">
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="relative flex h-2 w-2">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#4A97EC] opacity-35" />
-                  <span className="relative inline-flex h-2 w-2 rounded-full bg-[#4A97EC]" />
-                </span>
-                <p className="text-[10px] font-bold text-[#384553]">SAWOL OFFICE · PIXEL FLOOR</p>
-              </div>
-              <p className="mt-1 text-[7px] text-[#8B97A3]">90명 규모를 기준으로 전체 → 부서 → 개인을 확대해 보는 운영 플로어</p>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              <button type="button" onClick={() => setShowOnlyActive((value) => !value)} className={`h-8 rounded-[9px] border px-2.5 text-[8px] font-semibold transition ${showOnlyActive ? "border-[#9AC5F6] bg-[#EDF6FF] text-[#3479C7]" : "border-[#DEE5EB] bg-white text-[#76828E] hover:bg-[#F7F9FB]"}`}>
-                {showOnlyActive ? "전체 직원 보기" : "활동 직원만"}
+          <div className="flex flex-wrap items-center gap-1.5">
+            {statItems.map(({ label, value, icon: Icon }) => (
+              <button key={label} type="button" onClick={() => label === "승인" ? setDrawer("approval") : undefined} className="hidden h-8 items-center gap-1.5 rounded-[9px] border border-[#E1E7EC] bg-[#FAFCFD] px-2.5 text-[7px] text-[#73818E] lg:flex">
+                <Icon className="h-3 w-3 text-[#5E8FBC]" /><span>{label}</span><b className="text-[#364653]">{value}</b>
               </button>
-              <div className="flex h-8 items-center overflow-hidden rounded-[9px] border border-[#DEE5EB] bg-white">
-                <button type="button" onClick={() => setZoom((value) => Math.max(0.7, Math.round((value - 0.1) * 10) / 10))} className="flex h-full w-8 items-center justify-center text-[#73808D] hover:bg-[#F4F7F9]" aria-label="축소"><Minus className="h-3.5 w-3.5" /></button>
-                <div className="flex h-full min-w-12 items-center justify-center border-x border-[#E4E9EE] px-2 text-[8px] font-semibold text-[#64717E]">{Math.round(zoom * 100)}%</div>
-                <button type="button" onClick={() => setZoom((value) => Math.min(1.2, Math.round((value + 0.1) * 10) / 10))} className="flex h-full w-8 items-center justify-center text-[#73808D] hover:bg-[#F4F7F9]" aria-label="확대"><Plus className="h-3.5 w-3.5" /></button>
-              </div>
+            ))}
+            <button type="button" onClick={() => setShowOnlyActive((value) => !value)} className={`h-8 rounded-[9px] border px-2.5 text-[8px] font-semibold ${showOnlyActive ? "border-[#9CC9F2] bg-[#ECF6FF] text-[#3378B9]" : "border-[#DFE5EA] bg-white text-[#6F7D8A]"}`}>{showOnlyActive ? "전체 직원" : "활동만"}</button>
+            <div className="flex h-8 overflow-hidden rounded-[9px] border border-[#DFE5EA] bg-white">
+              <button type="button" onClick={() => changeZoom(-0.08)} className="flex w-8 items-center justify-center text-[#6E7D8A] hover:bg-[#F3F6F8]"><Minus className="h-3.5 w-3.5" /></button>
+              <button type="button" onClick={() => setZoom(0.82)} className="flex min-w-12 items-center justify-center border-x border-[#E5EAEE] px-2 text-[7px] font-bold text-[#5F6D7A]">{Math.round(zoom * 100)}%</button>
+              <button type="button" onClick={() => changeZoom(0.08)} className="flex w-8 items-center justify-center text-[#6E7D8A] hover:bg-[#F3F6F8]"><Plus className="h-3.5 w-3.5" /></button>
             </div>
+            <button type="button" onClick={() => setFocusMode((value) => !value)} className="flex h-8 items-center gap-1.5 rounded-[9px] bg-[#263440] px-3 text-[8px] font-semibold text-white hover:bg-[#1D2A34]">
+              {focusMode ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}{focusMode ? "나가기" : "집중모드"}
+            </button>
           </div>
+        </div>
 
-          <div className="border-b border-[#E0E7ED] bg-[#FBFCFD] px-4 py-2.5"><StatusLegend /></div>
+        <div className="relative border-b border-[#D7E1E8] bg-[#F9FBFC] px-4 py-2"><StatusLegend /></div>
 
-          <div className="relative max-h-[760px] overflow-auto bg-[#ECF3F8] p-4 sm:p-5">
-            <div style={{ width: canvasWidth * zoom, height: canvasHeight * zoom }}>
-              <div className="origin-top-left" style={{ width: canvasWidth, minHeight: canvasHeight, transform: `scale(${zoom})` }}>
-                <div className="relative overflow-hidden rounded-[22px] border-[5px] border-[#AEBECC] bg-[#DCE8F2] p-5 shadow-[0_18px_35px_rgba(70,93,117,.18)]">
-                  <div className="absolute inset-0 opacity-[0.32]" style={{ backgroundImage: "linear-gradient(#C3D3E0 1px, transparent 1px), linear-gradient(90deg, #C3D3E0 1px, transparent 1px)", backgroundSize: "24px 24px" }} />
-                  <div className="relative z-10 grid grid-cols-[260px_1fr_240px] gap-4">
-                    <div className="rounded-[17px] border border-[#C1D0DD] bg-[#F8FBFD]/95 p-4 shadow-sm">
-                      <div className="flex items-center justify-between gap-2">
-                        <div>
-                          <p className="text-[10px] font-black text-[#2E3A46]">대표실</p>
-                          <p className="mt-1 text-[7px] text-[#8794A0]">CEO ROOM</p>
-                        </div>
-                        <div className="flex h-9 w-9 items-center justify-center rounded-[11px] bg-[#25313D] text-white"><BriefcaseBusiness className="h-4 w-4" /></div>
-                      </div>
-                      <div className="mt-4 flex items-end justify-between rounded-[13px] border border-[#D4DDE5] bg-[#EFF4F8] p-3">
-                        <div>
-                          <div className="h-6 w-20 rounded-[3px] border border-[#A9B7C4] bg-white shadow-[0_3px_0_#BBC5CE]" />
-                          <div className="mx-auto h-5 w-8 rounded-b-[5px] bg-[#44505C]" />
-                        </div>
-                        <div className="flex h-11 w-11 items-center justify-center rounded-full border-2 border-white bg-[#25313D] text-[8px] font-black text-white shadow-md">대표</div>
-                      </div>
-                      <div className="mt-3 rounded-[11px] border border-[#E0E6EB] bg-white p-3">
-                        <p className="text-[7px] text-[#8B96A1]">대표 승인 대기</p>
-                        <p className="mt-1 text-[18px] font-black text-[#2D3844]">{summary.pendingApprovals}</p>
-                      </div>
-                    </div>
+        <div
+          ref={scrollerRef}
+          className={`relative select-none overflow-auto bg-[#DCE7EF] ${focusMode ? "h-[calc(100vh-97px)]" : "h-[760px]"}`}
+          onPointerDown={(event) => {
+            if ((event.target as HTMLElement).closest("button,a")) return;
+            const element = scrollerRef.current;
+            if (!element) return;
+            dragRef.current = { active: true, x: event.clientX, y: event.clientY, left: element.scrollLeft, top: element.scrollTop };
+            event.currentTarget.setPointerCapture(event.pointerId);
+          }}
+          onPointerMove={(event) => {
+            if (!dragRef.current.active) return;
+            const element = scrollerRef.current;
+            if (!element) return;
+            element.scrollLeft = dragRef.current.left - (event.clientX - dragRef.current.x);
+            element.scrollTop = dragRef.current.top - (event.clientY - dragRef.current.y);
+          }}
+          onPointerUp={(event) => {
+            dragRef.current.active = false;
+            try { event.currentTarget.releasePointerCapture(event.pointerId); } catch {}
+          }}
+          onPointerCancel={() => { dragRef.current.active = false; }}
+        >
+          <div className="pointer-events-none sticky left-4 top-4 z-40 inline-flex rounded-full border border-white/80 bg-[#263440]/90 px-3 py-1.5 text-[7px] font-semibold text-white shadow-lg backdrop-blur">빈 공간을 드래그해서 이동 · 직원/업무 클릭 가능</div>
 
-                    <div className="rounded-[17px] border border-[#BFD2E2] bg-[#F4F9FD]/95 p-4 shadow-sm">
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <p className="text-[10px] font-black text-[#31506B]">윤서진 비서실 · 중앙 관제</p>
-                          <p className="mt-1 text-[7px] text-[#7E94A8]">업무 분석 → 배정 → 결과 취합 → 대표 보고</p>
-                        </div>
-                        <div className="rounded-full border border-[#C8DBEA] bg-white px-2.5 py-1 text-[7px] font-semibold text-[#527694]">SECRETARY HUB</div>
-                      </div>
+          <div className="relative p-6" style={{ width: canvasWidth * zoom + 48, height: canvasHeight * zoom + 48 }}>
+            <div className="origin-top-left" style={{ width: canvasWidth, height: canvasHeight, transform: `scale(${zoom})` }}>
+              <div className="relative h-full overflow-hidden rounded-[22px] border-[6px] border-[#A7B7C5] bg-[#C9D8E3] shadow-[0_22px_50px_rgba(45,65,83,.22)]">
+                <div className="absolute inset-0 opacity-30" style={{ backgroundImage: "linear-gradient(#B7C8D5 1px, transparent 1px), linear-gradient(90deg, #B7C8D5 1px, transparent 1px)", backgroundSize: "28px 28px" }} />
 
-                      <div className="mt-4 flex items-center gap-4">
-                        {secretary ? (
-                          <PixelPerson employee={secretary} selected={selectedEmployee?.id === secretary.id} highlighted={highlightedEmployeeIds.has(secretary.id)} onClick={() => setSelectedEmployee(secretary)} />
-                        ) : (
-                          <div className="flex h-[82px] w-[78px] items-center justify-center rounded-[12px] border border-dashed border-[#BDD0E0] text-[8px] text-[#8FA1B1]">비서실</div>
-                        )}
-                        <div className="grid flex-1 grid-cols-3 gap-2">
-                          <div className="rounded-[10px] border border-[#D5E2EC] bg-white p-2.5 text-center"><p className="text-[7px] text-[#8A98A4]">분석</p><p className="mt-1 text-[10px] font-bold text-[#4A647B]">업무 분해</p></div>
-                          <div className="rounded-[10px] border border-[#D5E2EC] bg-white p-2.5 text-center"><p className="text-[7px] text-[#8A98A4]">취합</p><p className="mt-1 text-[10px] font-bold text-[#4A647B]">결과 묶음</p></div>
-                          <div className="rounded-[10px] border border-[#D5E2EC] bg-white p-2.5 text-center"><p className="text-[7px] text-[#8A98A4]">보고</p><p className="mt-1 text-[10px] font-bold text-[#4A647B]">대표 전달</p></div>
-                        </div>
-                      </div>
-                    </div>
+                {/* ENTRANCE / LOBBY */}
+                <div className="absolute left-1/2 top-0 z-20 h-[92px] w-[360px] -translate-x-1/2 rounded-b-[18px] border-x-2 border-b-2 border-[#AEBECA] bg-[#F7FAFC]/95 shadow-sm">
+                  <div className="mx-auto mt-3 flex h-8 w-[210px] items-center justify-center rounded-[7px] bg-[#263440] text-[10px] font-black tracking-[0.13em] text-white">SAWOL OFFICE</div>
+                  <div className="mt-2 flex items-center justify-center gap-3 text-[7px] font-semibold text-[#778692]"><span className="h-4 w-16 rounded-[3px] border border-[#B8C5CF] bg-[#DCE8F0]" /> MAIN ENTRANCE <span className="h-4 w-16 rounded-[3px] border border-[#B8C5CF] bg-[#DCE8F0]" /></div>
+                </div>
 
-                    <div className="rounded-[17px] border border-[#C5D5E2] bg-[#F8FBFD]/95 p-4 shadow-sm">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-[10px] font-black text-[#334455]">결과 데스크</p>
-                          <p className="mt-1 text-[7px] text-[#8795A2]">승인된 산출물 보관</p>
-                        </div>
-                        <FileText className="h-4 w-4 text-[#57748E]" />
-                      </div>
-                      <div className="mt-4 grid grid-cols-3 gap-2">
-                        {["PDF", "XLSX", "IMG"].map((type) => <div key={type} className="flex h-14 items-center justify-center rounded-[9px] border border-[#D5E1EA] bg-white text-[7px] font-bold text-[#667887] shadow-[0_2px_0_#D5DEE6]">{type}</div>)}
-                      </div>
-                      <Link href="/results" className="mt-3 flex h-8 items-center justify-center rounded-[9px] bg-[#EAF3FA] text-[8px] font-semibold text-[#3E6F95]">결과함 열기</Link>
-                    </div>
+                {/* EXECUTIVE FLOOR */}
+                <div className="absolute left-8 right-8 top-[116px] z-10 grid grid-cols-[320px_1fr_270px] gap-5">
+                  <div className="rounded-[14px] border-2 border-[#B6C5D1] bg-[#F9FBFD] p-4 shadow-sm">
+                    <div className="flex items-center justify-between"><div><p className="text-[11px] font-black text-[#2E3B47]">대표실</p><p className="mt-1 text-[6px] tracking-[0.16em] text-[#83909B]">CEO ROOM</p></div><BriefcaseBusiness className="h-4 w-4 text-[#3C566A]" /></div>
+                    <div className="mt-4 flex items-center justify-between rounded-[10px] border border-[#D7DFE6] bg-[#EEF3F7] p-3"><div><div className="h-7 w-24 rounded-[3px] border border-[#AEB9C3] bg-white shadow-[0_3px_0_#BBC5CD]" /><div className="mx-auto h-5 w-10 rounded-b bg-[#46525E]" /></div><div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#263440] text-[8px] font-black text-white">대표</div></div>
+                    <button type="button" onClick={() => setDrawer("approval")} className="mt-3 flex w-full items-center justify-between rounded-[9px] border border-[#E2D8B7] bg-[#FFF9EA] px-3 py-2 text-[8px] font-semibold text-[#7F641C]"><span>대표 승인 대기</span><b>{summary.pendingApprovals}</b></button>
                   </div>
 
-                  <div className="relative z-10 mt-4 grid gap-4" style={{ gridTemplateColumns: `repeat(${roomColumns}, minmax(0, 1fr))` }}>
-                    {visibleDepartments.map((department) => (
-                      <DepartmentRoom
-                        key={department.id}
-                        department={department}
-                        selectedEmployeeId={selectedEmployee?.id ?? null}
-                        highlightedEmployeeIds={highlightedEmployeeIds}
-                        onSelectEmployee={setSelectedEmployee}
-                      />
+                  <div className="rounded-[14px] border-2 border-[#B4CADB] bg-[#F2F8FC] p-4 shadow-sm">
+                    <div className="flex items-center justify-between"><div><p className="text-[11px] font-black text-[#31506A]">윤서진 비서실 · 중앙 관제</p><p className="mt-1 text-[7px] text-[#7890A3]">업무 분석 → 직원 배정 → 결과 취합 → 대표 보고</p></div><span className="rounded-full border border-[#C8D9E6] bg-white px-2.5 py-1 text-[6px] font-bold text-[#567893]">SECRETARY HUB</span></div>
+                    <div className="mt-4 flex items-center gap-5">{secretary ? <PixelPerson employee={secretary} selected={selectedEmployee?.id === secretary.id} highlighted={highlightedEmployeeIds.has(secretary.id)} onClick={() => openEmployee(secretary)} /> : <div className="flex h-[80px] w-[80px] items-center justify-center rounded-[10px] border border-dashed border-[#BFD0DE] text-[8px] text-[#8CA0B1]">비서실</div>}<div className="grid flex-1 grid-cols-3 gap-2">{[["분석","업무 분해"],["취합","결과 묶음"],["보고","대표 전달"]].map(([a,b]) => <div key={a} className="rounded-[9px] border border-[#D7E2EB] bg-white p-2.5 text-center"><p className="text-[6px] text-[#8796A3]">{a}</p><p className="mt-1 text-[9px] font-bold text-[#45647C]">{b}</p></div>)}</div></div>
+                  </div>
+
+                  <div className="rounded-[14px] border-2 border-[#BCCBD6] bg-[#F9FBFD] p-4 shadow-sm">
+                    <div className="flex items-center justify-between"><div><p className="text-[11px] font-black text-[#344653]">결과 데스크</p><p className="mt-1 text-[6px] text-[#82909C]">FINAL DELIVERY</p></div><FileText className="h-4 w-4 text-[#5A778D]" /></div>
+                    <div className="mt-4 grid grid-cols-3 gap-2">{["PDF","XLSX","IMG"].map((type) => <div key={type} className="flex h-14 items-center justify-center rounded-[7px] border border-[#D6E0E8] bg-white text-[7px] font-black text-[#627585] shadow-[0_2px_0_#D7E0E7]">{type}</div>)}</div>
+                    <Link href="/results" className="mt-3 flex h-8 items-center justify-center rounded-[8px] bg-[#E8F2F9] text-[8px] font-bold text-[#3C6B91]">결과함 열기</Link>
+                  </div>
+                </div>
+
+                {/* MAIN CORRIDOR HEADER */}
+                <div className="absolute left-8 right-8 top-[350px] z-10 flex h-[66px] items-center justify-between rounded-[10px] border-2 border-[#AEBECB] bg-[#E7EEF3] px-5 shadow-inner">
+                  <div className="flex items-center gap-3"><Route className="h-4 w-4 text-[#55758F]" /><div><p className="text-[9px] font-black text-[#455867]">MAIN CORRIDOR</p><p className="mt-1 text-[6px] text-[#7E8E9A]">대표실 · 비서실 ↔ 각 부서 ↔ 회의 / 결과 공간</p></div></div><div className="flex items-center gap-3"><PixelPlant /><div className="h-7 w-24 rounded-[5px] border border-[#BCC8D1] bg-[#D6E1E8]" /><PixelPlant /></div>
+                </div>
+
+                {/* DEPARTMENT WINGS */}
+                <div className="absolute left-8 right-8 top-[440px] z-10">
+                  <div className="space-y-4">
+                    {departmentPairs.map(([leftDepartment, rightDepartment], pairIndex) => (
+                      <div key={`pair-${pairIndex}`} className="grid grid-cols-[1fr_118px_1fr] items-stretch gap-4">
+                        {leftDepartment ? <DepartmentRoom department={leftDepartment} selectedEmployeeId={selectedEmployee?.id ?? null} highlightedEmployeeIds={highlightedEmployeeIds} onSelectEmployee={openEmployee} /> : <div />}
+                        <div className="relative min-h-[286px] overflow-hidden rounded-[10px] border-x-2 border-[#AEBECB] bg-[#E6EDF2]">
+                          <div className="absolute left-1/2 top-0 h-full w-[2px] -translate-x-1/2 bg-[#C0CDD7]" />
+                          <div className="absolute left-1/2 top-6 -translate-x-1/2 whitespace-nowrap rounded-full border border-[#C4D0D9] bg-white px-2 py-1 text-[6px] font-bold tracking-[0.12em] text-[#748592]">CORRIDOR {pairIndex + 1}</div>
+                          <div className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-6"><PixelPlant /><div className="h-12 w-20 rounded-[6px] border border-[#B6C3CD] bg-[#CFD9E0] shadow-[0_3px_0_#B6C2CB]" /><PixelPlant /></div>
+                          <div className="absolute bottom-5 left-1/2 -translate-x-1/2 text-[6px] text-[#8998A4]">업무 이동 동선</div>
+                        </div>
+                        {rightDepartment ? <DepartmentRoom department={rightDepartment} selectedEmployeeId={selectedEmployee?.id ?? null} highlightedEmployeeIds={highlightedEmployeeIds} onSelectEmployee={openEmployee} /> : <div className="rounded-[12px] border-2 border-dashed border-[#B8C7D3] bg-white/35" />}
+                      </div>
                     ))}
                   </div>
+                </div>
 
-                  <div className="relative z-10 mt-4 rounded-[16px] border border-[#BDD0DE] bg-[#F8FBFD]/95 p-3.5">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <p className="text-[9px] font-bold text-[#40515F]">업무 이동 레일</p>
-                        <p className="mt-1 text-[7px] text-[#8997A3]">선택한 workflow의 실제 담당자 순서를 따라 결과가 비서실과 대표실로 이동합니다.</p>
-                      </div>
-                      <Sparkles className="h-4 w-4 text-[#4F91D6]" />
-                    </div>
-                    <div className="mt-3">
-                      {selectedWorkflow ? <WorkflowRail workflow={selectedWorkflow} compact /> : <p className="py-4 text-center text-[8px] text-[#9AA4AE]">진행 중 workflow가 없습니다.</p>}
-                    </div>
-                  </div>
+                {/* SUPPORT ZONE */}
+                <div className="absolute bottom-7 left-8 right-8 z-10 grid h-[190px] grid-cols-[1fr_1.3fr_1fr] gap-5">
+                  <div className="rounded-[14px] border-2 border-[#B7C6D1] bg-[#F8FBFD] p-4"><p className="text-[10px] font-black text-[#3B4A56]">회의실</p><p className="mt-1 text-[6px] text-[#85939E]">COLLAB ROOM</p><div className="mt-6 flex justify-center"><div className="relative h-16 w-40 rounded-[10px] border border-[#AEBCC7] bg-[#D3DEE6] shadow-[0_4px_0_#B8C4CD]">{["-left-3 top-3","-right-3 top-3","left-8 -bottom-3","right-8 -bottom-3"].map((className, index) => <span key={index} className={`absolute h-8 w-7 rounded-[5px] border border-[#A4B1BB] bg-[#BFCCD5] ${className}`} />)}</div></div></div>
+                  <div className="rounded-[14px] border-2 border-[#B4C7D5] bg-[#F3F8FC] p-4"><div className="flex items-center justify-between"><div><p className="text-[10px] font-black text-[#36566E]">업무 전달 라운지</p><p className="mt-1 text-[6px] text-[#7E93A4]">HANDOFF / SECRETARY COLLECTION</p></div><Handshake className="h-4 w-4 text-[#4D826D]" /></div><div className="mt-4">{selectedWorkflow ? <WorkflowRail workflow={selectedWorkflow} compact /> : <div className="flex h-20 items-center justify-center text-[8px] text-[#91A0AC]">진행 중 workflow가 없습니다.</div>}</div></div>
+                  <div className="rounded-[14px] border-2 border-[#B7C6D1] bg-[#F8FBFD] p-4"><p className="text-[10px] font-black text-[#3B4A56]">휴게 / 탕비존</p><p className="mt-1 text-[6px] text-[#85939E]">BREAK AREA</p><div className="mt-5 flex items-center justify-center gap-5"><Coffee className="h-7 w-7 text-[#617D92]" /><div className="h-12 w-24 rounded-[8px] border border-[#B8C5CF] bg-[#D8E1E7] shadow-[0_3px_0_#BBC5CC]" /><PixelPlant /></div></div>
                 </div>
               </div>
             </div>
           </div>
-        </section>
+        </div>
 
-        <aside className="space-y-4">
-          {selectedEmployee ? <EmployeeDetail employee={selectedEmployee} onClose={() => setSelectedEmployee(null)} /> : (
-            <div className="rounded-[18px] border border-[#D9E3ED] bg-white p-4 shadow-[0_12px_30px_rgba(53,72,92,.08)]">
-              <div className="flex items-center gap-2"><Focus className="h-4 w-4 text-[#4B8ED7]" /><p className="text-[10px] font-bold text-[#384553]">오피스 사용법</p></div>
-              <p className="mt-3 text-[8px] leading-4 text-[#7E8995]">직원은 업무가 없어도 자기 자리에 그대로 있습니다. 직원이나 workflow를 선택하면 현재 업무와 전달 흐름이 강조됩니다.</p>
-              <div className="mt-3 rounded-[12px] bg-[#F4F8FB] p-3 text-[8px] leading-4 text-[#687583]">전체 회사 → 부서 → 직원 순서로 확대해서 보는 구조입니다. 90명이 넘어가도 한 화면에 정보를 억지로 다 펼치지 않습니다.</div>
+        {/* FLOATING CONTROLS */}
+        <div className="absolute right-4 top-[112px] z-50 flex flex-col gap-2">
+          <button type="button" onClick={() => setDrawer("workflows")} className="flex h-10 items-center gap-2 rounded-[11px] border border-[#D5E1EA] bg-white px-3 text-[8px] font-bold text-[#526473] shadow-lg hover:bg-[#F8FAFC]"><BriefcaseBusiness className="h-3.5 w-3.5 text-[#4B8FD0]" />업무 <span className="rounded-full bg-[#EAF4FD] px-1.5 py-0.5 text-[#3478B9]">{summary.activeWorkflows}</span></button>
+          <button type="button" onClick={() => setDrawer("handoffs")} className="flex h-10 items-center gap-2 rounded-[11px] border border-[#D5E1EA] bg-white px-3 text-[8px] font-bold text-[#526473] shadow-lg hover:bg-[#F8FAFC]"><Handshake className="h-3.5 w-3.5 text-[#4B886F]" />전달 <span className="rounded-full bg-[#EDF8F3] px-1.5 py-0.5 text-[#33775D]">{summary.recentHandoffs}</span></button>
+          <button type="button" onClick={() => setDrawer("approval")} className="flex h-10 items-center gap-2 rounded-[11px] border border-[#D5E1EA] bg-white px-3 text-[8px] font-bold text-[#526473] shadow-lg hover:bg-[#F8FAFC]"><FileCheck2 className="h-3.5 w-3.5 text-[#A77B23]" />승인 <span className="rounded-full bg-[#FFF6DF] px-1.5 py-0.5 text-[#8B671D]">{summary.pendingApprovals}</span></button>
+        </div>
+
+        {drawer ? (
+          <div className="absolute inset-y-[58px] right-0 z-[70] w-[min(360px,92vw)] border-l border-[#D6E0E8] bg-white shadow-[-18px_0_40px_rgba(42,61,80,.15)]">
+            <div className="flex h-12 items-center justify-between border-b border-[#E1E7EC] px-4"><div className="flex items-center gap-2"><PanelRightOpen className="h-4 w-4 text-[#4E89BF]" /><p className="text-[10px] font-black text-[#364450]">{drawer === "employee" ? "직원 상세" : drawer === "workflows" ? "진행 중 업무" : drawer === "handoffs" ? "최근 인수인계" : "대표 승인 대기"}</p></div><button type="button" onClick={() => setDrawer(null)} className="flex h-8 w-8 items-center justify-center rounded-[8px] border border-[#E3E8ED] text-[#77838E] hover:bg-[#F5F7F9]"><X className="h-4 w-4" /></button></div>
+            <div className={`overflow-auto p-4 ${focusMode ? "h-[calc(100vh-106px)]" : "max-h-[700px]"}`}>
+              {drawer === "employee" && selectedEmployee ? <EmployeeDetail employee={selectedEmployee} onClose={() => { setSelectedEmployee(null); setDrawer(null); }} /> : null}
+              {drawer === "workflows" ? <div className="space-y-2.5">{workflows.length ? workflows.map((workflow) => <button key={workflow.id} type="button" onClick={() => { setSelectedWorkflowId(workflow.id); setDrawer(null); }} className={`w-full rounded-[12px] border p-3 text-left ${selectedWorkflowId === workflow.id ? "border-[#9FC8F0] bg-[#EFF7FF]" : "border-[#E1E7EC] bg-[#FBFCFD]"}`}><div className="flex items-start justify-between gap-2"><p className="line-clamp-2 text-[8px] font-bold leading-4 text-[#43515E]">{workflow.title}</p><span className="shrink-0 text-[7px] font-black text-[#4384C4]">{Math.round(workflow.progress)}%</span></div><div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#E8EDF1]"><div className="h-full rounded-full bg-[#5A9CE1]" style={{ width: `${Math.max(3, Math.min(100, workflow.progress))}%` }} /></div><p className="mt-2 truncate text-[7px] text-[#8995A0]">{workflow.currentStepTitle || "다음 단계 준비 중"}</p></button>) : <p className="py-10 text-center text-[8px] text-[#97A2AC]">진행 중 업무가 없습니다.</p>}</div> : null}
+              {drawer === "handoffs" ? <div className="space-y-2.5">{handoffs.length ? handoffs.slice(0, 20).map((handoff) => <div key={handoff.id} className="rounded-[12px] border border-[#E1E8ED] bg-[#FBFDFE] p-3"><div className="flex items-center gap-1.5 text-[8px] font-bold text-[#44535F]"><span className="max-w-[110px] truncate">{handoff.fromEmployee}</span><ChevronRight className="h-3 w-3 text-[#94A0AA]" /><span className="max-w-[110px] truncate">{handoff.toEmployee}</span></div><p className="mt-2 text-[7px] leading-4 text-[#7A8792]">{handoff.title}</p><p className="mt-2 text-[6px] text-[#9CA6AE]">{formatTime(handoff.createdAt)}</p></div>) : <p className="py-10 text-center text-[8px] text-[#97A2AC]">최근 인수인계가 없습니다.</p>}</div> : null}
+              {drawer === "approval" ? <div><div className="rounded-[14px] border border-[#E7DCB9] bg-[#FFF9EA] p-4"><p className="text-[8px] font-semibold text-[#8C6B22]">대표가 확인할 업무</p><p className="mt-2 text-[28px] font-black text-[#394551]">{summary.pendingApprovals}</p><p className="mt-2 text-[7px] leading-4 text-[#81765D]">직원들의 세부 진행은 비서실이 관리하고, 대표에게는 승인·문제·최종 결과만 올라오는 구조를 유지합니다.</p></div><div className="mt-3 grid grid-cols-2 gap-2"><Link href="/approvals" className="flex h-10 items-center justify-center rounded-[10px] bg-[#263440] text-[8px] font-bold text-white">승인함</Link><Link href="/results" className="flex h-10 items-center justify-center rounded-[10px] border border-[#DDE4E9] bg-white text-[8px] font-bold text-[#4D5C68]">결과함</Link></div></div> : null}
             </div>
-          )}
-
-          <section className="rounded-[18px] border border-[#DDE4EA] bg-white p-4 shadow-[0_10px_28px_rgba(56,74,93,.06)]">
-            <div className="flex items-center justify-between gap-3">
-              <div><p className="text-[10px] font-bold text-[#394653]">진행 중 업무</p><p className="mt-1 text-[7px] text-[#8F9AA5]">클릭하면 관련 직원이 오피스에서 강조됩니다.</p></div>
-              <BriefcaseBusiness className="h-4 w-4 text-[#64829D]" />
-            </div>
-            <div className="mt-3 space-y-2">
-              {workflows.length ? workflows.slice(0, 8).map((workflow) => (
-                <button key={workflow.id} type="button" onClick={() => setSelectedWorkflowId(workflow.id)} className={`w-full rounded-[11px] border p-3 text-left transition ${selectedWorkflowId === workflow.id ? "border-[#A7C9EF] bg-[#F0F7FF] shadow-[0_0_0_2px_rgba(77,148,232,.07)]" : "border-[#E4E9EE] bg-[#FCFDFE] hover:bg-[#F7F9FB]"}`}>
-                  <div className="flex items-start justify-between gap-2"><p className="line-clamp-2 text-[8px] font-semibold leading-4 text-[#46525E]">{workflow.title}</p><span className="shrink-0 text-[7px] font-bold text-[#4384CC]">{Math.round(workflow.progress)}%</span></div>
-                  <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#E9EEF3]"><div className="h-full rounded-full bg-[#5A9CE4]" style={{ width: `${Math.max(3, Math.min(100, workflow.progress))}%` }} /></div>
-                  <p className="mt-2 truncate text-[7px] text-[#8C97A2]">{workflow.currentStepTitle || "비서실에서 다음 단계를 정리 중"}</p>
-                </button>
-              )) : <p className="rounded-[11px] border border-dashed border-[#DDE4EA] py-5 text-center text-[8px] text-[#9BA5AF]">진행 중 업무가 없습니다.</p>}
-            </div>
-          </section>
-
-          <section className="rounded-[18px] border border-[#DDE4EA] bg-white p-4 shadow-[0_10px_28px_rgba(56,74,93,.06)]">
-            <div className="flex items-center justify-between gap-3"><div><p className="text-[10px] font-bold text-[#394653]">최근 인수인계</p><p className="mt-1 text-[7px] text-[#8F9AA5]">직원이 다음 직원에게 넘긴 실제 handoff</p></div><Handshake className="h-4 w-4 text-[#438D70]" /></div>
-            <div className="mt-3 space-y-2.5">
-              {handoffs.length ? handoffs.slice(0, 7).map((handoff) => (
-                <div key={handoff.id} className="rounded-[11px] border border-[#E4EAEF] bg-[#FCFDFE] p-3">
-                  <div className="flex items-center gap-1.5 text-[8px] font-semibold text-[#46535F]"><span className="max-w-[90px] truncate">{handoff.fromEmployee}</span><ChevronRight className="h-3 w-3 shrink-0 text-[#9AA6B1]" /><span className="max-w-[90px] truncate">{handoff.toEmployee}</span></div>
-                  <p className="mt-1.5 line-clamp-2 text-[7px] leading-3.5 text-[#7F8B96]">{handoff.title}</p>
-                  <p className="mt-1.5 text-[6px] text-[#A0A9B2]">{formatTime(handoff.createdAt)}</p>
-                </div>
-              )) : <p className="rounded-[11px] border border-dashed border-[#DDE4EA] py-5 text-center text-[8px] text-[#9BA5AF]">최근 인수인계가 없습니다.</p>}
-            </div>
-          </section>
-
-          <section className="rounded-[18px] border border-[#E2E6E9] bg-[#2B3540] p-4 text-white shadow-[0_12px_28px_rgba(33,45,57,.16)]">
-            <div className="flex items-center gap-2"><CircleAlert className="h-4 w-4 text-[#9BC6F2]" /><p className="text-[10px] font-bold">대표가 보면 되는 것</p></div>
-            <p className="mt-3 text-[8px] leading-4 text-[#CED7DF]">직원들의 세부 작업은 오피스가 보여주고, 대표에게는 승인·문제·최종 결과만 올라오게 유지합니다.</p>
-            <div className="mt-3 grid grid-cols-2 gap-2"><Link href="/approvals" className="flex h-9 items-center justify-center rounded-[9px] bg-white/10 text-[8px] font-semibold hover:bg-white/15">승인함</Link><Link href="/results" className="flex h-9 items-center justify-center rounded-[9px] bg-white text-[8px] font-semibold text-[#2B3540]">결과함</Link></div>
-          </section>
-        </aside>
-      </div>
-
-      {selectedWorkflow ? (
-        <section className="rounded-[20px] border border-[#DCE4EA] bg-white p-4 sm:p-5">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div><p className="text-[10px] font-bold text-[#394653]">선택 업무 전달 전체 흐름</p><p className="mt-1 text-[8px] text-[#8B97A3]">대표 지시부터 직원별 작업, 비서 취합, 대표 보고까지 한 줄로 확인합니다.</p></div>
-            <Link href={`/tasks/${selectedWorkflow.rootTaskId}`} className="inline-flex h-8 items-center gap-1 rounded-[9px] border border-[#DDE5EB] px-2.5 text-[8px] font-semibold text-[#667582] hover:bg-[#F7F9FA]">업무 상세 <ChevronRight className="h-3 w-3" /></Link>
           </div>
-          <div className="mt-4"><WorkflowRail workflow={selectedWorkflow} /></div>
+        ) : null}
+      </section>
+
+      {!focusMode && selectedWorkflow ? (
+        <section className="mt-4 rounded-[18px] border border-[#DCE4EA] bg-white p-4">
+          <div className="flex items-center justify-between gap-3"><div><p className="text-[10px] font-black text-[#394653]">선택 업무 전달 흐름</p><p className="mt-1 text-[7px] text-[#8A96A1]">대표 지시 → 직원 협업 → 비서 취합 → 대표 보고</p></div><Link href={`/tasks/${selectedWorkflow.rootTaskId}`} className="flex h-8 items-center gap-1 rounded-[9px] border border-[#DEE5EA] px-2.5 text-[8px] font-semibold text-[#667582]">업무 상세 <ChevronRight className="h-3 w-3" /></Link></div>
+          <div className="mt-3"><WorkflowRail workflow={selectedWorkflow} /></div>
         </section>
       ) : null}
-
-      <style jsx global>{`
-        @media (prefers-reduced-motion: no-preference) {
-          .sawol-pixel-office-working {
-            animation: sawolPixelWorking 2.2s steps(2, end) infinite;
-          }
-        }
-        @keyframes sawolPixelWorking {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-1px); }
-        }
-      `}</style>
     </div>
   );
 }
